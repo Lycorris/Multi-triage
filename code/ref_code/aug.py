@@ -18,11 +18,11 @@ MAX_SEQUENCE_LENGTH, EMBEDDING_DIM = 300, 100
 LoadDataAugFromFile = False
 LearningRate = 0.001
 VALIDATION_SPLIT = 0.2
-data = pd.read_csv('Data/powershell/C_uA_Train.csv')
+data = pd.read_csv('../Data/powershell/C_uA_Train.csv')
 
 # /*Get Contextual Word Embedding Model*/
 TRANSFORMERS_OFFLINE=1
-aug = naw.ContextualWordEmbsAug(model_path='bert-base-uncased', action="substitute") # aug是上下文替换器
+aug = naw.ContextualWordEmbsAug(model_path='../bert-base-uncased', action="substitute") # aug是上下文替换器
 # /*Get Developer Bug Count/
 dfcountbybug = data.groupby(["Name", "FixedByID"], as_index=True)["FixedByID"].size().reset_index(name="count")
 dfcountbybug.to_csv(DataFilePath + 'list.csv')
