@@ -1,7 +1,7 @@
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
-from keras.preprocessing.text import Tokenizer
+from keras_preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
@@ -55,6 +55,7 @@ def tokenize_dataset_input(train_dataset: TextCodeDataset, test_dataset: TextCod
     tokenizer_A.fit_on_texts(train_dataset.x_AST + test_dataset.x_AST)
     train_dataset.tokenize_input(tokenizer_C, tokenizer_A)
     test_dataset.tokenize_input(tokenizer_C, tokenizer_A)
+    return [len(tokenizer_C.word_index), len(tokenizer_A.word_index)]
 
 
 def map_dataset_output(train_dataset: TextCodeDataset, test_dataset: TextCodeDataset):
@@ -85,8 +86,12 @@ if __name__ == '__main__':
     train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN)
     test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN)
 
-    tokenize_dataset_input(train_dataset, test_dataset)
-    map_dataset_output(train_dataset, test_dataset)
+    vocab_size = tokenize_dataset_input(train_dataset, test_dataset)
+    idx2label = map_dataset_output(train_dataset, test_dataset)
+    num_out = [len(x) for x in idx2label]
+
+    # print(vocab_size)  # [12513, 5910]
+    # print(num_out)  # [396, 204]
 
     # train_dataset[0]
     # ((tensor([[100, 64, 383, ..., 0, 0, 0],
