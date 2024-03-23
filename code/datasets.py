@@ -15,8 +15,9 @@ class TextCodeDataset(Dataset):
         self.data_pd = pd.read_csv(data_path,
                                    error_bad_lines=False, index_col=False, dtype='unicode', encoding='latin-1',
                                    low_memory=False).sample(frac=1)
+        # print(self.data_pd.head(5))
         self.y_dev, self.y_btype = list(self.data_pd['FixedByID']), list(self.data_pd['Name'])
-        self.y_dev, self.y_btype = [x.split('|') for x in self.y_dev], [x.split('|') for x in self.y_btype]
+        self.y_dev, self.y_btype = [str(x).split('|') for x in self.y_dev], [str(x).split('|') for x in self.y_btype]
 
         self.x_context, self.x_AST = list(self.data_pd['Title_Description']), list(self.data_pd['AST'])
         self.x_context, self.x_AST = [str(x) for x in self.x_context], [str(x) for x in self.x_AST]
@@ -40,8 +41,8 @@ class TextCodeDataset(Dataset):
         self.y_dev, self.y_btype = tensor_d, tensor_b
 
     def __getitem__(self, item):
-        input = self.x_context, self.x_AST if self.use_AST else self.x_context
-        output = self.y_dev, self.y_btype if self.classify_btype else self.y_dev
+        input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
+        output = self.y_dev[item], self.y_btype[item] if self.classify_btype else self.y_dev[item]
         return input, output
 
     def __len__(self):
@@ -92,7 +93,18 @@ if __name__ == '__main__':
 
     # print(vocab_size)  # [12513, 5910]
     # print(num_out)  # [396, 204]
-
+    print(len(train_dataset[0])) # 2 表示输入和输出
+    print(len(train_dataset[0][0])) # 2 表示x_context和x_AST
+    print(train_dataset[0][0]) #两个tensor 分别对应x_context和x_AST
+    print(train_dataset[0][1]) #两个tensor 分别对应y_dev和y_btype
+    #检查x_context的形状
+    print(train_dataset[0][0][0].shape) #torch.Size([300]) 
+    #检查x_AST的形状
+    print(train_dataset[0][0][1].shape) #torch.Size([300])
+    #检查y_dev的形状
+    print(train_dataset[0][1][0].shape) #torch.Size([396]) 
+    #检查y_btype的形状
+    print(train_dataset[0][1][1].shape) #torch.Size([204])
     # train_dataset[0]
     # ((tensor([[100, 64, 383, ..., 0, 0, 0],
     #           [2035, 606, 105, ..., 0, 0, 0],

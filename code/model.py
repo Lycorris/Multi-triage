@@ -16,19 +16,16 @@ class MetaModel(nn.Module):
         self.emb_dim = emb_dim
         self.seq_len = seq_len
         self.num_out = num_out
-
         self.context = nn.Sequential(
             nn.Embedding(self.vocab_size[0], self.emb_dim),
-            nn.Conv1d(self.seq_len, 64, kernel_size=2),
+            nn.Conv1d(self.emb_dim, 64, kernel_size=2),  # Change self.seq_len to self.emb_dim
             nn.ReLU(),
             nn.MaxPool1d(99, 1),
             nn.Flatten(),
         )
         self.AST = nn.Sequential(
             nn.Embedding(self.vocab_size[1], self.emb_dim),
-            # nn.LSTM(self.emb_dim, 25, batch_first=True, bidirectional=True),
-            # nn.MaxPool1d(50, 1),
-            nn.Conv1d(self.seq_len, 50, kernel_size=2),
+            nn.Conv1d(self.emb_dim, 50, kernel_size=2),  # Change self.seq_len to self.emb_dim
             nn.ReLU(),
             nn.MaxPool1d(99, 1),
             nn.Flatten(),
