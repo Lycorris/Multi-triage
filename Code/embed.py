@@ -1,8 +1,8 @@
 from transformers import AlbertTokenizer, AlbertModel
 import torch
+from torch.nn.utils.rnn import pad_sequence
 
-
-def get_word_embedding(sentences: list, tokenizer: str, device):
+def get_word_embedding(sentences: list, tokenizer: str, device,max_seq_len=300):
     """
     Args:
         sentences: list of sentence, (n_sentence)
@@ -12,10 +12,10 @@ def get_word_embedding(sentences: list, tokenizer: str, device):
         embedded sentence, (n_sentence, emb_dim)
     """
     if tokenizer == "Albert":
-        return albert_emb(sentences, device)
+        return albert_emb(sentences, device, max_seq_len)
 
 
-def albert_emb(sentences, device):
+def albert_emb(sentences, device, max_seq_len=300):
     # Load pre-trained model tokenizer (vocabulary)
     tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
 
@@ -23,9 +23,17 @@ def albert_emb(sentences, device):
     for i, sentence in enumerate(sentences):
         sentence_tokenized = tokenizer.tokenize(sentence)
         sentence_tokenized_id = tokenizer.convert_tokens_to_ids(sentence_tokenized)
+        # print(sentence_tokenized_id)
+        # print(sentences)
         sentences[i] = sentence_tokenized_id
 
-    sentences = torch.tensor(sentences)
+    # Assume sentences is your list of lists with varying lengths
+    sentences = [torch.tensor(s) for s in sentences]
+
+    # Pad the sequences
+    sentences_padded = pad_sequence(sentences, batch_first=True)
+    sentences_sliced = sentences_padded[:, :max_seq_len]
+    sentences = torch.tensor(sentences_sliced)
     sentences = sentences.to(device)
 
     # Load pre-trained model (weights)
@@ -44,6 +52,6 @@ def albert_emb(sentences, device):
 if __name__ == '__main__':
     mySentences = ["Hello, my dog is cute", "Hello, my cat is cute"]
     myTokenizer = "Albert"
-    myDevice = "mps"
+    myDevice = "cpu"
     print(get_word_embedding(mySentences, myTokenizer, myDevice).shape)
     # torch.Size([2, 6, 768])

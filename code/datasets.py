@@ -11,10 +11,8 @@ class TextCodeDataset(Dataset):
         self.pad_seq_len = pad_seq_len
         self.use_AST, self.classify_btype = use_AST, classify_btype
         self.from_emb = from_emb
-        self.data_pd = pd.read_csv(data_path,
-                                   error_bad_lines=False, index_col=False, dtype='unicode', encoding='latin-1',
+        self.data_pd = pd.read_csv(data_path, index_col=False, dtype='unicode', encoding='latin-1',
                                    low_memory=False).sample(frac=1)
-        # print(self.data_pd.head(5))
         self.y_dev, self.y_btype = list(self.data_pd['FixedByID']), list(self.data_pd['Name'])
         self.y_dev, self.y_btype = [str(x).split('|') for x in self.y_dev], [str(x).split('|') for x in self.y_btype]
 
@@ -59,7 +57,7 @@ def tokenize_dataset_input(train_dataset: TextCodeDataset, test_dataset: TextCod
     tokenizer_A.fit_on_texts(train_dataset.x_AST + test_dataset.x_AST)
     train_dataset.tokenize_input(tokenizer_C, tokenizer_A)
     test_dataset.tokenize_input(tokenizer_C, tokenizer_A)
-    return [len(tokenizer_C.word_index), len(tokenizer_A.word_index)]
+    return [len(tokenizer_C.word_index)+100, len(tokenizer_A.word_index)+100]
 
 
 def map_dataset_output(train_dataset: TextCodeDataset, test_dataset: TextCodeDataset):

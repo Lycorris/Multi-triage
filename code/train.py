@@ -25,7 +25,7 @@ TOKENIZER = "Albert"
 # model
 MAX_SEQ_LEN = 300
 from_emb = True
-EMB_DIM = 100
+EMB_DIM = 768 if from_emb else 100 # TODO: config EMB_DIM according to TOKENIZER
 filter = [64, 64]
 linear_concat = 50
 # loss_fn
@@ -64,9 +64,11 @@ optimizer = Adam(model.parameters(), lr=Learning_Rate)
 def one_forward(data):
     (x_context, x_AST), (y_dev, y_btype) = data
     if from_emb:
-        x_context = get_word_embedding(x_context, tokenizer=TOKENIZER, device=device)
-        x_AST = get_word_embedding(x_AST, tokenizer=TOKENIZER, device=device)
-    y_dev_pred, y_btype_pred = model(x_context.long().to(device), x_AST.long().to(device))
+        # print(x_context[:2], x_AST[:2])
+        x_context = get_word_embedding(list(x_context), tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+        x_AST = get_word_embedding(list(x_AST), tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+    # print(x_context.shape, x_AST.shape)
+    y_dev_pred, y_btype_pred = model(x_context.to(device), x_AST.to(device))
     y = torch.concat((y_dev, y_btype), 1).to(device)
     y_pred = torch.concat((y_dev_pred, y_btype_pred), 1)
     loss = loss_fn(y_pred, y)

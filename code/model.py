@@ -44,7 +44,7 @@ class MetaModel(nn.Module):
         self.seq_len = seq_len
         self.feature_C = nn.Sequential(
             # (Batch_sz, emb_dim, seq_len)
-            nn.Conv1d(self.emb_dim, self.filter_C, kernel_size=2, padding='same'),
+            nn.Conv1d(self.emb_dim, self.filter_C, kernel_size=3, padding='same'),
             nn.ReLU(),
             # (Batch_sz, filter_c, seq_len)
             nn.MaxPool1d(self.seq_len, 1),
@@ -53,7 +53,7 @@ class MetaModel(nn.Module):
             # (Batch_sz, filter_c)
         )
         self.feature_A = nn.Sequential(
-            nn.Conv1d(self.emb_dim, self.filter_A, kernel_size=2, padding='same'),
+            nn.Conv1d(self.emb_dim, self.filter_A, kernel_size=3, padding='same'),
             nn.ReLU(),
             nn.MaxPool1d(self.seq_len, 1),
             nn.Flatten(),
@@ -82,7 +82,6 @@ class MetaModel(nn.Module):
             x_C = self.emb_C(x_C)
             x_A = self.emb_A(x_A)
         # (Batch_sz, seq_len, emb_dim)
-
         # 2. Feature Extracting separately
         x_C = x_C.permute(0, 2, 1)
         x_A = x_A.permute(0, 2, 1)
@@ -90,13 +89,11 @@ class MetaModel(nn.Module):
         x_C = self.feature_C(x_C)
         x_A = self.feature_A(x_A)
         # (Batch_sz, filter)
-
         # 3. Joint Linear
         x = torch.concat((x_C, x_A), 1)
         # (Batch_sz, filter_C + filter_A)
         x = self.fc(x)
         # (Batch_sz, linear_concat)
-
         # 4. Respective CLS
         y_D = self.fc_D(x)
         # (Batch_sz, n_classes_D)
