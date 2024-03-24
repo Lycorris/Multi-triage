@@ -1,5 +1,6 @@
 from transformers import AlbertTokenizer, AlbertModel
 from torch import torch
+
 # Load pre-trained model tokenizer (vocabulary)
 tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
 
@@ -38,3 +39,7 @@ with torch.no_grad():
 print(len(outputs))
 print(encoded_layers.shape)
 print(pooler_output.shape)
+# ['▁hello', ',', '▁my', '▁dog', '▁is', '▁cute']
+# 2
+# torch.Size([1, 6, 768])
+# torch.Size([1, 768])

@@ -1,9 +1,29 @@
 import torch
 from torch import nn
+"""
+    original model(
+        seq_len,
+        from_emb: bool, vocab_size: list, emb_dim, -> Embedding
+        filter: list -> Feature Extracting separately
+        linear_concat -> Joint Linear
+        n_classes -> Respective CLS
+    ):
+    1. Embedding
+        a. Embedding
+    2. Feature Extracting separately
+        a. 1 Conv1d(Context, Btype respectively) + ReLU + MaxPool1d
+        b. Flatten
+    3. Joint Linear
+        a. BatchNorm1d + Dropout
+        b. 1 Linear + ReLU
+    4. Respective CLS
+        a. 1 Linear(Dev, Btype respectively) -> logits
+"""
 
 
 class MetaModel(nn.Module):
-    def __init__(self, vocab_size: list, emb_dim: int, seq_len: int, num_out: list):
+    def __init__(self, seq_len, from_emb: bool, vocab_size: list, emb_dim, filter: list, linear_concat,
+                 n_classes: list):
         """
         Args:
             vocab_size: list, the size of C/A vocab
@@ -12,60 +32,96 @@ class MetaModel(nn.Module):
             num_out: list, the output size of D/B
         """
         super(MetaModel, self).__init__()
+        # 1. Embedding
+        self.from_emb = from_emb
         self.vocab_size = vocab_size
         self.emb_dim = emb_dim
+        self.emb_C = nn.Embedding(self.vocab_size[0], self.emb_dim)
+        self.emb_A = nn.Embedding(self.vocab_size[1], self.emb_dim)
+
+        # 2. Feature Extracting separately
+        self.filter_C, self.filter_A = filter
         self.seq_len = seq_len
-        self.num_out = num_out
-        self.context = nn.Sequential(
-            nn.Embedding(self.vocab_size[0], self.emb_dim),
-            nn.Conv1d(self.emb_dim, 64, kernel_size=2),  # Change self.seq_len to self.emb_dim
+        self.feature_C = nn.Sequential(
+            # (Batch_sz, emb_dim, seq_len)
+            nn.Conv1d(self.emb_dim, self.filter_C, kernel_size=2, padding='same'),
             nn.ReLU(),
-            nn.MaxPool1d(99, 1),
+            # (Batch_sz, filter_c, seq_len)
+            nn.MaxPool1d(self.seq_len, 1),
+            # (Batch_sz, filter_c, 1)
             nn.Flatten(),
+            # (Batch_sz, filter_c)
         )
-        self.AST = nn.Sequential(
-            nn.Embedding(self.vocab_size[1], self.emb_dim),
-            nn.Conv1d(self.emb_dim, 50, kernel_size=2),  # Change self.seq_len to self.emb_dim
+        self.feature_A = nn.Sequential(
+            nn.Conv1d(self.emb_dim, self.filter_A, kernel_size=2, padding='same'),
             nn.ReLU(),
-            nn.MaxPool1d(99, 1),
+            nn.MaxPool1d(self.seq_len, 1),
             nn.Flatten(),
-        )
-        self.fc = nn.Sequential(
-            nn.BatchNorm1d(114, affine=False),
-            nn.Dropout(0.5),
-            nn.Linear(114, 50),
-            nn.ReLU()
-        )
-        self.fc_d = nn.Sequential(
-            nn.Linear(50, self.num_out[0]),
-            nn.Sigmoid(),
-        )
-        self.fc_b = nn.Sequential(
-            nn.Linear(50, self.num_out[1]),
-            nn.Sigmoid(),
         )
 
+        # 3. Joint Linear
+        self.linear_concat = linear_concat
+        self.fc = nn.Sequential(
+            # (Batch_sz, filter_C + filter_A)
+            nn.BatchNorm1d(self.filter_C + self.filter_A, affine=False),
+            nn.Dropout(0.5),
+            nn.Linear(self.filter_C + self.filter_A, self.linear_concat),
+            # (Batch_sz, linear_concat)
+            nn.ReLU()
+        )
+
+        # 4. Respective CLS
+        self.n_classes_D, self.n_classes_B = n_classes
+        self.fc_D = nn.Linear(self.linear_concat, self.n_classes_D)
+        self.fc_B = nn.Linear(self.linear_concat, self.n_classes_B)
+
     def forward(self, x_C, x_A):
-        # x, y
-        x_C = self.context(x_C)
-        x_A = self.AST(x_A)
+        # 1. Embedding
+        # (Batch_sz, seq_len)
+        if not self.from_emb:
+            x_C = self.emb_C(x_C)
+            x_A = self.emb_A(x_A)
+        # (Batch_sz, seq_len, emb_dim)
+
+        # 2. Feature Extracting separately
+        print(x_C.shape)
+        x_C = x_C.permute(0, 2, 1)
+        print(x_C.shape)
+        x_A = x_A.permute(0, 2, 1)
+        # (Batch_sz, emb_dim, seq_len)
+        x_C = self.feature_C(x_C)
+        x_A = self.feature_A(x_A)
+        # (Batch_sz, filter)
+
+        # 3. Joint Linear
         x = torch.concat((x_C, x_A), 1)
+        # (Batch_sz, filter_C + filter_A)
         x = self.fc(x)
-        y_d = self.fc_d(x)
-        y_b = self.fc_b(x)
-        return y_d, y_b
+        # (Batch_sz, linear_concat)
+
+        # 4. Respective CLS
+        y_D = self.fc_D(x)
+        # (Batch_sz, n_classes_D)
+        y_B = self.fc_B(x)
+        # (Batch_sz, n_classes_B)
+        return y_D, y_B
 
 
 if __name__ == '__main__':
-    vocab_size = [12513, 5910]
-    num_out = [396, 204]
-    EMB_DIM = 100
+    # sanity test
+    Batch_sz = 64
     MAX_SEQ_LEN = 300
+    from_emb = False
+    vocab_size = [12513, 5910]
+    EMB_DIM = 100
+    filter = [64, 64]
+    linear_concat = 50
+    n_classes = [396, 204]
 
-    model = MetaModel(vocab_size, EMB_DIM, MAX_SEQ_LEN, num_out)
+    model = MetaModel(MAX_SEQ_LEN, from_emb, vocab_size, EMB_DIM, filter, linear_concat, n_classes)
     model.eval()
     with torch.no_grad():
-        input_C, input_A = torch.ones((1, 300)).long(), torch.ones((1, 300)).long()
+        input_C, input_A = torch.ones((Batch_sz, MAX_SEQ_LEN)).long(), torch.ones((Batch_sz, MAX_SEQ_LEN)).long()
         output_d, output_b = model(input_C, input_A)
     print(output_d.shape)
     print(output_d)
