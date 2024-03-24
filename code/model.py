@@ -108,6 +108,7 @@ class MetaModel(nn.Module):
 
 
 if __name__ == '__main__':
+    # TODO: 搬运到configurations.py
     # sanity test
     Batch_sz = 64
     MAX_SEQ_LEN = 300

@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import unittest
 """
 Losses:
     (pred_logits, y_binarized)
@@ -54,6 +55,7 @@ class CustomizedBCELoss(nn.Module):
         x = nn.Sigmoid()(x)
         loss_pos = y * torch.log(x)
         loss_neg = (1 - y) * torch.log(1 - x)
+        # loss = 0.8*loss_pos + 0.2*loss_neg
         loss = self.weight_pos * loss_pos + self.weight_neg * loss_neg
         return -torch.sum(loss)
 
@@ -115,7 +117,34 @@ class AsymmetricLossOptimized(nn.Module):
 
         return -self.loss.sum()
 
+class TestLossFunction(unittest.TestCase):
+    def test_BCEWithMSELoss(self):
+        eps = 1e-4
+        y = torch.tensor([0, 1, 0]).float()
+        pred = torch.tensor([0.1, 0.9, 0.1])
+        loss = BCEWithMSELoss()
+        result = loss(pred, y).item()
+        print(f"BCEWithMSE:{result}")
+        excepted_ans = 0.3311
+        self.assertTrue(abs(result - excepted_ans) < eps)
+    
+    def test_CustomizedBCELoss(self):
+        eps = 1e-4
+        y = torch.tensor([0, 1, 0])
+        pred = torch.tensor([0.1, 0.9, 0.1])
+        loss = CustomizedBCELoss()
+        result = loss(pred, y).item()
+        print(f"CustomizedBCE:{result}")
+        excepted_ans = 0.5706
+        self.assertTrue(abs(result - excepted_ans) < eps)
+
+    # def test_AsymmetricLossOptimized(self):
+    #     y = torch.tensor([0, 1, 0])
+    #     pred = torch.tensor([0.1, 0.9, 0.1])
+    #     loss = AsymmetricLossOptimized()
+    #     result = loss(pred, y).item()
+    #     print(f"ASL LOSS:{result}")
 
 if __name__ == '__main__':
     # TODO: sanity test
-    y = torch.tensor([0, 1, 0])
+    unittest.main()
