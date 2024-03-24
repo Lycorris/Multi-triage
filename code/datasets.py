@@ -6,12 +6,11 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 class TextCodeDataset(Dataset):
-    def __init__(self, data_path, pad_seq_len, use_AST=True, classify_btype=True):
+    def __init__(self, data_path, pad_seq_len, use_AST=True, classify_btype=True, from_emb=False):
         self.data_path = data_path
         self.pad_seq_len = pad_seq_len
         self.use_AST, self.classify_btype = use_AST, classify_btype
-        # 读取Datafile, 返回删除格式错误的行，不用index列(不知为啥)，dtype=unicode，编码方式latin-1，low-memory避免数据类型不同的问题
-        # sample(frac = 1)打乱取全部(不懂，后面都按CreateDate排序了)
+        self.from_emb = from_emb
         self.data_pd = pd.read_csv(data_path,
                                    error_bad_lines=False, index_col=False, dtype='unicode', encoding='latin-1',
                                    low_memory=False).sample(frac=1)
@@ -21,6 +20,7 @@ class TextCodeDataset(Dataset):
 
         self.x_context, self.x_AST = list(self.data_pd['Title_Description']), list(self.data_pd['AST'])
         self.x_context, self.x_AST = [str(x) for x in self.x_context], [str(x) for x in self.x_AST]
+        self.x_context_str, self.x_AST_str = self.x_context, self.x_AST
 
     def tokenize_input(self, tokenizer_C: Tokenizer, tokenizer_A: Tokenizer):
         self.x_context = tokenizer_C.texts_to_sequences(self.x_context)
@@ -41,7 +41,10 @@ class TextCodeDataset(Dataset):
         self.y_dev, self.y_btype = tensor_d, tensor_b
 
     def __getitem__(self, item):
-        input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
+        if not self.from_emb:
+            input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
+        else:
+            input = self.x_context_str[item], self.x_AST_str[item] if self.use_AST else self.x_context_str[item]
         output = self.y_dev[item], self.y_btype[item] if self.classify_btype else self.y_dev[item]
         return input, output
 

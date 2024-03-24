@@ -5,86 +5,128 @@ from torch.nn import BCELoss
 from torch.optim import SGD
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+from tqdm import trange
+from torch.utils.tensorboard import SummaryWriter
 
+from configuration import *
 from datasets import *
 from model import *
+from embed import *
+from losses import *
 from metrics import *
 
-# dataset
+### Configuration
+# data
 train_path = 'Data/powershell/C_uA_Train.csv'
 test_path = 'Data/powershell/C_uA_Test.csv'
+B_sz = 64
+# emb
+TOKENIZER = "Albert"
+# model
 MAX_SEQ_LEN = 300
-# why 100?
+from_emb = True
 EMB_DIM = 100
-Learning_Rate = 1e-3
+filter = [64, 64]
+linear_concat = 50
+# loss_fn
+loss_name = "ASL"
+# TODO: config loss_fn type & params
+# optimizer
+# TODO: config optimizer type
+# train
 EPOCH = 20
+Learning_Rate = 1e-3
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN)
-test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN)
+### train
+# dataset
+train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb)
+test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb)
 
-vocab_size = tokenize_dataset_input(train_dataset, test_dataset)
+vocab_size = tokenize_dataset_input(train_dataset, test_dataset)  # vocab_sz
 idx2label = map_dataset_output(train_dataset, test_dataset)
-num_out = [len(x) for x in idx2label]
+n_classes = [len(x) for x in idx2label]  # n_classes
 
 # dataloader
-train_loader = DataLoader(train_dataset, batch_size=64)
-test_loader = DataLoader(test_dataset, batch_size=64)
+train_loader = DataLoader(train_dataset, batch_size=B_sz)
+test_loader = DataLoader(test_dataset, batch_size=B_sz)
 
 # model
-model = MetaModel(vocab_size, EMB_DIM, MAX_SEQ_LEN, num_out)
+model = MetaModel(MAX_SEQ_LEN, from_emb, vocab_size, EMB_DIM, filter, linear_concat, n_classes)
 
 # loss_func
-loss_fn = BCELoss()
+loss_fn = AsymmetricLossOptimized()
 
 # optimizer
-optimizer = SGD(model.parameters(), lr=Learning_Rate)
-# optimizer adam
-# optimizer = Adam(model.parameters(), lr=Learning_Rate)
+optimizer = Adam(model.parameters(), lr=Learning_Rate)
+
 
 def one_forward(data):
     (x_context, x_AST), (y_dev, y_btype) = data
-    print(f"x_context: {x_context.shape}, x_AST: {x_AST.shape}, y_dev: {y_dev.shape}, y_btype: {y_btype.shape}")
-    y_dev_pred, y_btype_pred = model(x_context, x_AST)
-    y = torch.concat((y_dev, y_btype), 1)
+    if from_emb:
+        x_context = get_word_embedding(x_context, tokenizer=TOKENIZER, device=device)
+        x_AST = get_word_embedding(x_AST, tokenizer=TOKENIZER, device=device)
+    y_dev_pred, y_btype_pred = model(x_context.long().to(device), x_AST.long().to(device))
+    y = torch.concat((y_dev, y_btype), 1).to(device)
     y_pred = torch.concat((y_dev_pred, y_btype_pred), 1)
-    loss, acc = loss_fn(y, y_pred), metrics_acc(y, y_pred)
-    return loss, acc
+    loss = loss_fn(y_pred, y)
+    metric = metrics(y, y_pred, split_pos=n_classes)
+    return loss, metric['acc'], metric['precision'], metric['recall'], metric['F1']
 
 
 def one_backward(optimizer, loss):
     optimizer.zero_grad()
     loss.backward()
+    # Gradient clipping
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
     optimizer.step()
 
 
-start_time = time.time()
-for epoch in range(EPOCH):
-    print('epoch{} begin:'.format(epoch))
+# torch.autograd.set_detect_anomaly(True)
+# scaler = torch.cuda.amp.GradScaler()
+
+writer = SummaryWriter('./tf-logs')
+for epoch in trange(EPOCH):
 
     # train
-    print('train:')
     model.train()
-    for step, data in tqdm(enumerate(train_loader)):
-        loss, acc = one_forward(data)
-
+    for step, data in enumerate(train_loader):
+        loss, acc, precision, recall, f1 = one_forward(data)
         one_backward(optimizer, loss)
 
-        if step % 100 == 0:
-            print('epoch{} step{} time:{}, loss:{}, acc:{}'.format(epoch, step, time.time() - start_time, loss, acc))
-            start_time = time.time()
-
     # val
-    print('val:')
     model.eval()
-    val_loss, val_acc = 0, 0
+    val_loss, val_acc, val_precision, val_recall, val_F1 = 0, [0, 0], [0, 0], [0, 0], [0, 0]
     with torch.no_grad():
-        for step, data in tqdm(enumerate(test_loader)):
-            loss, acc = one_forward(data)
-            val_loss += loss.item()
-            val_acc += acc
-    print('{}th epoch val_loss: {}, val_acc:{}'.format(epoch, val_loss, val_acc))
+        for step, data in enumerate(test_loader):
+            loss, acc, precision, recall, f1 = one_forward(data)
+            l = len(test_loader)
+            val_loss += loss.item() / l
+            val_acc[0] += acc[0] / l
+            val_acc[1] += acc[1] / l
+            val_precision[0] += precision[0] / l
+            val_precision[1] += precision[1] / l
+            val_recall[0] += recall[0] / l
+            val_recall[1] += recall[1] / l
+            val_F1[0] += f1[0] / l
+            val_F1[1] += f1[1] / l
+
+    print(
+        '{}th epoch\n val_loss: {}\n val_acc:{}\n val_precision:{}\n val_recall:{}\n val_f1: {}'.format(epoch, val_loss,
+                                                                                                        val_acc,
+                                                                                                        val_precision,
+                                                                                                        val_recall,
+                                                                                                        val_F1))
+    writer.add_scalar('val_loss' + loss_name + str(Learning_Rate), val_loss, epoch)
+    writer.add_scalar('val_acc_d' + loss_name + str(Learning_Rate), val_acc[0], epoch)
+    writer.add_scalar('val_acc_b' + loss_name + str(Learning_Rate), val_acc[1], epoch)
+    # writer.add_scalar('val_precision'+loss_name+str(Learning_Rate), val_precision, epoch)
+    # writer.add_scalar('val_recall'+loss_name+str(Learning_Rate), val_recall, epoch)
+    writer.add_scalar('val_f1_d' + loss_name + str(Learning_Rate), val_F1[0], epoch)
+    writer.add_scalar('val_f1_b' + loss_name + str(Learning_Rate), val_F1[1], epoch)
 
     # save model
-    torch.save(model, 'savedmodel/model_epoch{}.pth'.format(epoch))
+    # if epoch % 20 == 0:
+    #   torch.save(model, '../savedmodel/model_epoch{}.pth'.format(epoch))
+
+writer.close()

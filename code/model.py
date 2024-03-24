@@ -84,9 +84,7 @@ class MetaModel(nn.Module):
         # (Batch_sz, seq_len, emb_dim)
 
         # 2. Feature Extracting separately
-        print(x_C.shape)
         x_C = x_C.permute(0, 2, 1)
-        print(x_C.shape)
         x_A = x_A.permute(0, 2, 1)
         # (Batch_sz, emb_dim, seq_len)
         x_C = self.feature_C(x_C)
