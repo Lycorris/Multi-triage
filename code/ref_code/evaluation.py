@@ -48,7 +48,7 @@ def hammingloss(y_true, y_pred, threshold=0.5, mode='multilabel'):
     of labels.
     In multi-class classification, hamming loss is calculated as the
     hamming distance between `actual` and `predictions`.
-    In multi-label classification, hamming loss penalizes only the
+    In Multi-label classification, hamming loss penalizes only the
     individual labels.
     Args:
         y_true: actual target value
@@ -56,7 +56,7 @@ def hammingloss(y_true, y_pred, threshold=0.5, mode='multilabel'):
         threshold: Elements of `y_pred` greater than threshold are
             converted to be 1, and the rest 0. If threshold is
             None, the argmax is converted to 1, and the rest 0.
-        mode: multi-class or multi-label
+        mode: multi-class or Multi-label
     Returns:
         hamming loss: float
     Usage:
@@ -73,7 +73,7 @@ def hammingloss(y_true, y_pred, threshold=0.5, mode='multilabel'):
                           dtype=tf.float32)
     hl.update_state(actuals, predictions)
     print('Hamming loss: ', hl.result().numpy()) # 0.25
-    # multi-label hamming loss
+    # Multi-label hamming loss
     hl = HammingLoss(mode='multilabel', threshold=0.8)
     actuals = tf.constant([[1, 0, 1, 0],[0, 1, 0, 1],
                        [0, 0, 0,1]], dtype=tf.int32)
@@ -109,7 +109,7 @@ def hammingloss(y_true, y_pred, threshold=0.5, mode='multilabel'):
 
 
 def c_precision(y_true, y_pred):
-    """Calculates the precision, a metric for multi-label classification of
+    """Calculates the precision, a metric for Multi-label classification of
     how many selected items are relevant.
     """
     y_pred = tf.cast(y_pred, tf.float32)
@@ -123,7 +123,7 @@ def c_precision(y_true, y_pred):
 def c_recall(y_true, y_pred):
     y_pred = tf.cast(y_pred, tf.float32)
     y_true = tf.cast(y_true, tf.float32)
-    '''Calculates the recall, a metric for multi-label classification of
+    '''Calculates the recall, a metric for Multi-label classification of
     how many relevant items are selected.
     '''
     true_positives = tf.cast(K.sum(K.round(K.clip(y_true * y_pred, 0, 1))), tf.float32)
