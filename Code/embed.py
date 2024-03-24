@@ -1,7 +1,6 @@
 from transformers import AlbertTokenizer, AlbertModel
 import torch
-from torch.nn.utils.rnn import pad_sequence
-
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 def get_word_embedding(sentences: list, tokenizer: str, device,max_seq_len=300):
     """
     Args:
@@ -27,13 +26,8 @@ def albert_emb(sentences, device, max_seq_len=300):
         # print(sentences)
         sentences[i] = sentence_tokenized_id
 
-    # Assume sentences is your list of lists with varying lengths
-    sentences = [torch.tensor(s) for s in sentences]
-
-    # Pad the sequences
-    sentences_padded = pad_sequence(sentences, batch_first=True)
-    sentences_sliced = sentences_padded[:, :max_seq_len]
-    sentences = torch.tensor(sentences_sliced)
+    sentences_padded = pad_sequences(sentences, maxlen=max_seq_len, padding='post')
+    sentences = torch.tensor(sentences_padded)
     sentences = sentences.to(device)
 
     # Load pre-trained model (weights)

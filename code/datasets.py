@@ -3,6 +3,9 @@ import torch
 from torch.utils.data import Dataset
 from keras_preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tqdm import trange
+
+from embed import *
 
 
 class TextCodeDataset(Dataset):
@@ -18,7 +21,27 @@ class TextCodeDataset(Dataset):
 
         self.x_context, self.x_AST = list(self.data_pd['Title_Description']), list(self.data_pd['AST'])
         self.x_context, self.x_AST = [str(x) for x in self.x_context], [str(x) for x in self.x_AST]
-        self.x_context_str, self.x_AST_str = self.x_context, self.x_AST
+        self.x_context_emb, self.x_AST_emb = self.x_context, self.x_AST
+
+    def get_embeded(self, tokenizer, device, max_seq_len):
+        print('-' * 20 + 'embedding begin' + '-' * 20)
+        emb_c, emb_a = torch.tensor([]).to(device), torch.tensor([]).to(device)
+
+        for i in trange(0, len(self.x_context_emb), 64):
+            batch_c = self.x_context_emb[i:i + 64]
+            batch_a = self.x_AST_emb[i:i + 64]
+
+            batch_emb_c = get_word_embedding(batch_c, tokenizer, device, max_seq_len)
+            batch_emb_a = get_word_embedding(batch_a, tokenizer, device, max_seq_len)
+
+            emb_c = torch.concat((emb_c, batch_emb_c))
+            emb_a = torch.concat((emb_a, batch_emb_c))
+            torch.cuda.empty_cache()
+
+        self.x_context_emb, self.x_AST_emb = emb_c, emb_a
+        # self.x_context_emb = get_word_embedding(self.x_context_emb, tokenizer, device,max_seq_len)
+        # self.x_AST_emb = get_word_embedding(self.x_AST_emb, tokenizer, device,max_seq_len)
+        print('-' * 20 + 'embedding over' + '-' * 20)
 
     def tokenize_input(self, tokenizer_C: Tokenizer, tokenizer_A: Tokenizer):
         self.x_context = tokenizer_C.texts_to_sequences(self.x_context)
@@ -42,7 +65,7 @@ class TextCodeDataset(Dataset):
         if not self.from_emb:
             input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
         else:
-            input = self.x_context_str[item], self.x_AST_str[item] if self.use_AST else self.x_context_str[item]
+            input = self.x_context_emb[item], self.x_AST_emb[item] if self.use_AST else self.x_context_emb[item]
         output = self.y_dev[item], self.y_btype[item] if self.classify_btype else self.y_dev[item]
         return input, output
 
@@ -57,7 +80,7 @@ def tokenize_dataset_input(train_dataset: TextCodeDataset, test_dataset: TextCod
     tokenizer_A.fit_on_texts(train_dataset.x_AST + test_dataset.x_AST)
     train_dataset.tokenize_input(tokenizer_C, tokenizer_A)
     test_dataset.tokenize_input(tokenizer_C, tokenizer_A)
-    return [len(tokenizer_C.word_index)+100, len(tokenizer_A.word_index)+100]
+    return [len(tokenizer_C.word_index) + 100, len(tokenizer_A.word_index) + 100]
 
 
 def map_dataset_output(train_dataset: TextCodeDataset, test_dataset: TextCodeDataset):
@@ -94,18 +117,18 @@ if __name__ == '__main__':
 
     # print(vocab_size)  # [12513, 5910]
     # print(num_out)  # [396, 204]
-    print(len(train_dataset[0])) # 2 表示输入和输出
-    print(len(train_dataset[0][0])) # 2 表示x_context和x_AST
-    print(train_dataset[0][0]) #两个tensor 分别对应x_context和x_AST
-    print(train_dataset[0][1]) #两个tensor 分别对应y_dev和y_btype
-    #检查x_context的形状
-    print(train_dataset[0][0][0].shape) #torch.Size([300]) 
-    #检查x_AST的形状
-    print(train_dataset[0][0][1].shape) #torch.Size([300])
-    #检查y_dev的形状
-    print(train_dataset[0][1][0].shape) #torch.Size([396]) 
-    #检查y_btype的形状
-    print(train_dataset[0][1][1].shape) #torch.Size([204])
+    print(len(train_dataset[0]))  # 2 表示输入和输出
+    print(len(train_dataset[0][0]))  # 2 表示x_context和x_AST
+    print(train_dataset[0][0])  # 两个tensor 分别对应x_context和x_AST
+    print(train_dataset[0][1])  # 两个tensor 分别对应y_dev和y_btype
+    # 检查x_context的形状
+    print(train_dataset[0][0][0].shape)  # torch.Size([300])
+    # 检查x_AST的形状
+    print(train_dataset[0][0][1].shape)  # torch.Size([300])
+    # 检查y_dev的形状
+    print(train_dataset[0][1][0].shape)  # torch.Size([396])
+    # 检查y_btype的形状
+    print(train_dataset[0][1][1].shape)  # torch.Size([204])
     # train_dataset[0]
     # ((tensor([[100, 64, 383, ..., 0, 0, 0],
     #           [2035, 606, 105, ..., 0, 0, 0],

@@ -17,14 +17,14 @@ from metrics import *
 
 ### Configuration
 # data
-train_path = 'Data/powershell/C_uA_Train.csv'
-test_path = 'Data/powershell/C_uA_Test.csv'
+train_path = '../Data/powershell/C_uA_Train.csv'
+test_path = '../Data/powershell/C_uA_Test.csv'
 B_sz = 64
 # emb
 TOKENIZER = "Albert"
 # model
 MAX_SEQ_LEN = 300
-from_emb = True
+from_emb = False
 EMB_DIM = 768 if from_emb else 100 # TODO: config EMB_DIM according to TOKENIZER
 filter = [64, 64]
 linear_concat = 50
@@ -43,6 +43,9 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb)
 test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb)
 
+if from_emb:
+    train_dataset.get_embeded(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+    test_dataset.get_embeded(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
 vocab_size = tokenize_dataset_input(train_dataset, test_dataset)  # vocab_sz
 idx2label = map_dataset_output(train_dataset, test_dataset)
 n_classes = [len(x) for x in idx2label]  # n_classes
@@ -52,10 +55,10 @@ train_loader = DataLoader(train_dataset, batch_size=B_sz)
 test_loader = DataLoader(test_dataset, batch_size=B_sz)
 
 # model
-model = MetaModel(MAX_SEQ_LEN, from_emb, vocab_size, EMB_DIM, filter, linear_concat, n_classes)
+model = MetaModel(MAX_SEQ_LEN, from_emb, vocab_size, EMB_DIM, filter, linear_concat, n_classes).to(device)
 
 # loss_func
-loss_fn = AsymmetricLossOptimized()
+loss_fn = AsymmetricLossOptimized().to(device)
 
 # optimizer
 optimizer = Adam(model.parameters(), lr=Learning_Rate)
@@ -63,10 +66,6 @@ optimizer = Adam(model.parameters(), lr=Learning_Rate)
 
 def one_forward(data):
     (x_context, x_AST), (y_dev, y_btype) = data
-    if from_emb:
-        # print(x_context[:2], x_AST[:2])
-        x_context = get_word_embedding(list(x_context), tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
-        x_AST = get_word_embedding(list(x_AST), tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
     # print(x_context.shape, x_AST.shape)
     y_dev_pred, y_btype_pred = model(x_context.to(device), x_AST.to(device))
     y = torch.concat((y_dev, y_btype), 1).to(device)
