@@ -1,5 +1,6 @@
 import time
-
+import argparse
+import json
 import torch
 from torch.nn import BCELoss
 from torch.optim import SGD
@@ -15,28 +16,55 @@ from embed import *
 from losses import *
 from metrics import *
 
-### Configuration
+# Load default configuration from JSON file
+with open('config.json', 'r') as f:
+    CONFIG = json.load(f)
+
+parser = argparse.ArgumentParser()
+
+# Add the arguments
+parser.add_argument('--batch_size', type=int, default=CONFIG['batch_size'])
+parser.add_argument('--max_seq_len', type=int, default=CONFIG['max_seq_len'])
+parser.add_argument('--from_emb', type=bool, default=CONFIG['from_emb'])
+parser.add_argument('--vocab_size', type=list, default=CONFIG['vocab_size'])
+parser.add_argument('--emb_dim', type=int, default=CONFIG['emb_dim'])
+parser.add_argument('--filter', type=list, default=CONFIG['filter'])
+parser.add_argument('--linear_concat', type=int, default=CONFIG['linear_concat'])
+parser.add_argument('--n_classes', type=list, default=CONFIG['n_classes'])
+parser.add_argument('--train_path', type=str, default=CONFIG['train_path'])
+parser.add_argument('--test_path', type=str, default=CONFIG['test_path'])
+parser.add_argument('--learning_rate', type=float, default=CONFIG['learning_rate'])
+parser.add_argument('--epochs_num', type=int, default=CONFIG['epochs_num'])
+parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
+
+# Parse the arguments
+args = parser.parse_args()
+
+# Update CONFIG with command line arguments
+CONFIG.update(vars(args))
+
+### Load Configuration
 # data
-train_path = './Data/powershell/C_uA_Train.csv'
-test_path = './Data/powershell/C_uA_Test.csv'
-B_sz = 64
+train_path = CONFIG['train_path']
+test_path = CONFIG['test_path']
+B_sz = CONFIG['batch_size']
 # emb
-TOKENIZER = "Albert"
+TOKENIZER = CONFIG['tokenizer_name']
 # model
-MAX_SEQ_LEN = 300
-from_emb = True
-EMB_DIM = 768 if from_emb else 100 # TODO: config EMB_DIM according to TOKENIZER
-filter = [64, 64]
-linear_concat = 50
+MAX_SEQ_LEN = CONFIG['max_seq_len']
+from_emb = CONFIG['from_emb']
+EMB_DIM = CONFIG['emb_dim']
+filter = CONFIG['filter']
+linear_concat = CONFIG['linear_concat']
+model_name = CONFIG['model_name']
 # loss_fn
-loss_name = "ASL"
-# TODO: config loss_fn type & params
+loss_name = CONFIG['loss_name']
 # optimizer
-# TODO: config optimizer type
+optimizer_name = CONFIG['optimizer_name']
 # train
-EPOCH = 20
-Learning_Rate = 1e-3
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+EPOCH = CONFIG['epochs_num']
+Learning_Rate = CONFIG['learning_rate']
+device = CONFIG['device']
 
 ### train
 # dataset
@@ -54,14 +82,18 @@ n_classes = [len(x) for x in idx2label]  # n_classes
 train_loader = DataLoader(train_dataset, batch_size=B_sz)
 test_loader = DataLoader(test_dataset, batch_size=B_sz)
 
+#TODO : add elif for other models, losses and optimizers
 # model
-model = MetaModel(MAX_SEQ_LEN, from_emb, vocab_size, EMB_DIM, filter, linear_concat, n_classes).to(device)
+if model_name == 'TextCNN':
+    model = MetaModel(MAX_SEQ_LEN, from_emb, vocab_size, EMB_DIM, filter, linear_concat, n_classes).to(device)
 
 # loss_func
-loss_fn = AsymmetricLossOptimized().to(device)
+if loss_name == 'ASL':
+    loss_fn = AsymmetricLossOptimized().to(device)
 
 # optimizer
-optimizer = Adam(model.parameters(), lr=Learning_Rate)
+if optimizer_name == 'Adam':
+    optimizer = Adam(model.parameters(), lr=Learning_Rate)
 
 
 def one_forward(data):
