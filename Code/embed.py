@@ -18,9 +18,9 @@ def get_word_embedding(sentences: list, tokenizer, device, max_seq_len=300):
         tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
         model = AlbertModel.from_pretrained('albert-base-v2')
     elif tokenizer == "Bert":
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        model = BertModel.from_pretrained('bert-base-uncased')
-    elif tokenizer == "RoBERTa":
+        tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+        model = BertModel.from_pretrained('bert-large-uncased')
+    elif tokenizer == "RoBerta":
         tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
         model = RobertaModel.from_pretrained('roberta-base')
 
@@ -30,14 +30,17 @@ def get_word_embedding(sentences: list, tokenizer, device, max_seq_len=300):
         sentence_tokenized_id = tokenizer.convert_tokens_to_ids(sentence_tokenized)
         sentences[i] = sentence_tokenized_id
     sentences_padded = pad_sequences(sentences, maxlen=max_seq_len, padding='post', value=0)
-    # create attention mask
-    attention_mask = [[float(i != 0) for i in seq] for seq in sentences_padded]
+    
+    # tensorize sentences & create attention mask
     sentences = torch.tensor(sentences_padded)
-    # attention_mask = torch.where(sentences != 0, 1, 0)
+    attention_mask = torch.where(sentences != 0, 1, 0)
 
-    sentences.to(device)
-    model.to(device)
+    # to device
+    sentences = sentences.to(device)
+    attention_mask = attention_mask.to(device)
+    model = model.to(device)
 
+    # infer
     model.eval()
     with torch.no_grad():
         outputs = model(sentences, attention_mask=attention_mask)
@@ -49,6 +52,6 @@ def get_word_embedding(sentences: list, tokenizer, device, max_seq_len=300):
 if __name__ == '__main__':
     mySentences = ["Hello, my dog is cute", "Hello, my cat"]
     myTokenizer = "Albert"
-    myDevice = "cpu"
-    print(get_word_embedding(mySentences, myTokenizer, myDevice))
-    # torch.Size([2, 6, 768])
+    myDevice = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(get_word_embedding(mySentences, myTokenizer, myDevice).shape)
+    # torch.Size([2, 300, 768])
