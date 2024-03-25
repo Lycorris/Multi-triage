@@ -44,7 +44,7 @@ def albert_emb(sentences, device, max_seq_len=300):
 
     model.eval()
     with torch.no_grad():
-        outputs = model(sentences)
+        outputs = model(sentences,attention_mask=attention_mask)
         embedded_sentences = outputs[0]
         # pooled_output = outputs[1]
 
