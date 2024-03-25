@@ -35,7 +35,7 @@ class TextCodeDataset(Dataset):
             batch_emb_a = get_word_embedding(batch_a, tokenizer, device, max_seq_len)
 
             emb_c = torch.concat((emb_c, batch_emb_c))
-            emb_a = torch.concat((emb_a, batch_emb_c))
+            emb_a = torch.concat((emb_a, batch_emb_a))
             torch.cuda.empty_cache()
 
         self.x_context_emb, self.x_AST_emb = emb_c, emb_a

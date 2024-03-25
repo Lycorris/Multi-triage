@@ -17,14 +17,14 @@ from metrics import *
 
 ### Configuration
 # data
-train_path = '../Data/powershell/C_uA_Train.csv'
-test_path = '../Data/powershell/C_uA_Test.csv'
+train_path = './Data/powershell/C_uA_Train.csv'
+test_path = './Data/powershell/C_uA_Test.csv'
 B_sz = 64
 # emb
 TOKENIZER = "Albert"
 # model
 MAX_SEQ_LEN = 300
-from_emb = False
+from_emb = True
 EMB_DIM = 768 if from_emb else 100 # TODO: config EMB_DIM according to TOKENIZER
 filter = [64, 64]
 linear_concat = 50
