@@ -9,7 +9,6 @@ from torch.utils.data import DataLoader
 from tqdm import trange
 from torch.utils.tensorboard import SummaryWriter
 
-from configuration import *
 from datasets import *
 from model import *
 from embed import *
