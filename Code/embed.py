@@ -2,56 +2,60 @@ from transformers import AlbertTokenizer, AlbertModel
 from transformers import BertTokenizer, BertModel
 from transformers import RobertaTokenizer, RobertaModel
 import torch
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
-def get_word_embedding(sentences: list, tokenizer, device, max_seq_len=300):
+def get_tokenizer_models(pretrained_name, device):
+    tokenizer, model = None, None
+    # TODO: use AutoTokenizer.from_pretrained('path')
+    if pretrained_name == "Albert":
+        tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
+        model = AlbertModel.from_pretrained('albert-base-v2').to(device)
+    elif pretrained_name == "Bert":
+        tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+        model = BertModel.from_pretrained('bert-large-uncased').to(device)
+    elif pretrained_name == "RoBerta":
+        tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        model = RobertaModel.from_pretrained('roberta-base').to(device)
+    return tokenizer, model
+
+
+def get_sents_token_emb(sentences: list, pretrained_name: str, device, max_seq_len=300, mode: str = "token"):
     """
     Args:
+        mode: str, "token" or "emb"
+        max_seq_len: int, padding len
+        pretrained_name: str, the name of specified tokenizer model
         sentences: list of sentence, (n_sentence)
-        tokenizer: the name of specified tokenizer model
         device: 'cuda' or 'cpu' or 'mps'
     Returns:
         embedded sentence, (n_sentence, emb_dim)
     """
-    if tokenizer == "Albert":
-        tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
-        model = AlbertModel.from_pretrained('albert-base-v2')
-    elif tokenizer == "Bert":
-        tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
-        model = BertModel.from_pretrained('bert-large-uncased')
-    elif tokenizer == "RoBerta":
-        tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
-        model = RobertaModel.from_pretrained('roberta-base')
+    tokenizer, model = get_tokenizer_models(pretrained_name, device)
 
-    # tokenize, convert-to-id, pad
-    for i, sentence in enumerate(sentences):
-        sentence_tokenized = tokenizer.tokenize(sentence)
-        sentence_tokenized_id = tokenizer.convert_tokens_to_ids(sentence_tokenized)
-        sentences[i] = sentence_tokenized_id
-    sentences_padded = pad_sequences(sentences, maxlen=max_seq_len, padding='post', value=0)
-    
-    # tensorize sentences & create attention mask
-    sentences = torch.tensor(sentences_padded)
-    attention_mask = torch.where(sentences != 0, 1, 0)
+    # tokenize & to_ids & pad
+    tokenized_sents = tokenizer(sentences, padding='max_length',
+                                truncation=True, max_length=max_seq_len, return_tensors="pt").to(device)
+    if mode == "token":
+        return tokenized_sents
 
-    # to device
-    sentences = sentences.to(device)
-    attention_mask = attention_mask.to(device)
-    model = model.to(device)
-
-    # infer
-    model.eval()
-    with torch.no_grad():
-        outputs = model(sentences, attention_mask=attention_mask)
-        embedded_sentences = outputs[0]
-
-    return embedded_sentences
+    embedded_sentences = model(**tokenized_sents)[0]
+    if mode == "emb":
+        return embedded_sentences
 
 
 if __name__ == '__main__':
     mySentences = ["Hello, my dog is cute", "Hello, my cat"]
     myTokenizer = "Albert"
     myDevice = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(get_word_embedding(mySentences, myTokenizer, myDevice).shape)
+    myMode = 'emb'
+    # myDevice = 'mps' if torch.backends.mps.is_available() else 'cpu'
+    print(get_sents_token_emb(mySentences, myTokenizer, myDevice, mode=myMode).shape)
+    # Tokenized Inputs:
+    # {
+    #     input_ids:
+    #         tensor([[    0,   100,   437,  2283,     7,  1532,    59, 30581,  3923, 12346,
+    #          34379,   328,     2]])
+    #     attention_mask:
+    #         tensor([[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+    # }
     # torch.Size([2, 300, 768])

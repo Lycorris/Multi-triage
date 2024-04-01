@@ -52,6 +52,8 @@ TOKENIZER = CONFIG['tokenizer_name']
 # model
 MAX_SEQ_LEN = CONFIG['max_seq_len']
 from_emb = CONFIG['from_emb']
+# TODO: update in config
+from_token = CONFIG['from_token']
 EMB_DIM = CONFIG['emb_dim']
 filter = CONFIG['filter']
 linear_concat = CONFIG['linear_concat']
@@ -70,9 +72,15 @@ device = CONFIG['device']
 train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb)
 test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb)
 
+# TODO: optimize
+pretrained_model = None
 if from_emb:
-    train_dataset.get_embeded(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
-    test_dataset.get_embeded(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+    train_dataset.get_embedded(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+    test_dataset.get_embedded(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+elif from_token:
+    train_dataset.get_tokenized(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+    test_dataset.get_tokenized(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+    _, pretrained_model = get_tokenizer_models(TOKENIZER, device)
 vocab_size = tokenize_dataset_input(train_dataset, test_dataset)  # vocab_sz
 idx2label = map_dataset_output(train_dataset, test_dataset)
 n_classes = [len(x) for x in idx2label]  # n_classes
@@ -84,7 +92,7 @@ test_loader = DataLoader(test_dataset, batch_size=B_sz)
 #TODO : add elif for other models, losses and optimizers
 # model
 if model_name == 'TextCNN':
-    model = MetaModel(MAX_SEQ_LEN, from_emb, vocab_size, EMB_DIM, filter, linear_concat, n_classes).to(device)
+    model = MetaModel(MAX_SEQ_LEN, from_emb, from_token, pretrained_model, vocab_size, EMB_DIM, filter, linear_concat, n_classes).to(device)
 
 # loss_func
 if loss_name == 'ASL':

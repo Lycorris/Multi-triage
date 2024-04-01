@@ -1,5 +1,7 @@
 import torch
 from torch import nn
+from transformers import AlbertModel
+
 """
     original model(
         seq_len,
@@ -22,22 +24,24 @@ from torch import nn
 
 
 class MetaModel(nn.Module):
-    def __init__(self, seq_len, from_emb: bool, vocab_size: list, emb_dim, filter: list, linear_concat,
+    def __init__(self, seq_len, from_emb: bool, from_token: bool, pretrained_model, vocab_size: list, emb_dim, filter: list, linear_concat,
                  n_classes: list):
         """
         Args:
             vocab_size: list, the size of C/A vocab
             emb_dim: : int, the dim of C&A emb layer
             seq_len:  MAX_SEQ_LEN
-            num_out: list, the output size of D/B
+            n_classes: list, the output size of D/B
         """
         super(MetaModel, self).__init__()
         # 1. Embedding
         self.from_emb = from_emb
+        self.from_token = from_token
         self.vocab_size = vocab_size
         self.emb_dim = emb_dim
         self.emb_C = nn.Embedding(self.vocab_size[0], self.emb_dim)
         self.emb_A = nn.Embedding(self.vocab_size[1], self.emb_dim)
+        self.pretrained_model = pretrained_model
 
         # 2. Feature Extracting separately
         self.filter_C, self.filter_A = filter
@@ -78,7 +82,12 @@ class MetaModel(nn.Module):
     def forward(self, x_C, x_A):
         # 1. Embedding
         # (Batch_sz, seq_len)
-        if not self.from_emb:
+        if self.from_emb:
+            pass
+        elif self.from_token:
+            x_C = self.pretrained_model(x_C)[0]
+            x_A = self.pretrained_model(x_A)[0]
+        else:
             x_C = self.emb_C(x_C)
             x_A = self.emb_A(x_A)
         # (Batch_sz, seq_len, emb_dim)
@@ -103,18 +112,19 @@ class MetaModel(nn.Module):
 
 
 if __name__ == '__main__':
-    # TODO: 搬运到configurations.py
-    # sanity test
+    # Sanity Test
     Batch_sz = 64
     MAX_SEQ_LEN = 300
     from_emb = False
+    from_token = True
+    pretrained_model = AlbertModel.from_pretrained('albert-base-v2').to('cpu')
     vocab_size = [12513, 5910]
-    EMB_DIM = 100
+    EMB_DIM = 100 if not from_emb and not from_token else 768
     filter = [64, 64]
     linear_concat = 50
     n_classes = [396, 204]
 
-    model = MetaModel(MAX_SEQ_LEN, from_emb, vocab_size, EMB_DIM, filter, linear_concat, n_classes)
+    model = MetaModel(MAX_SEQ_LEN, from_emb, from_token, pretrained_model, vocab_size, EMB_DIM, filter, linear_concat, n_classes)
     model.eval()
     with torch.no_grad():
         input_C, input_A = torch.ones((Batch_sz, MAX_SEQ_LEN)).long(), torch.ones((Batch_sz, MAX_SEQ_LEN)).long()

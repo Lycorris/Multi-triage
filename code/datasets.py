@@ -9,11 +9,12 @@ from embed import *
 
 
 class TextCodeDataset(Dataset):
-    def __init__(self, data_path, pad_seq_len, use_AST=True, classify_btype=True, from_emb=False):
+    def __init__(self, data_path, pad_seq_len, use_AST=True, classify_btype=True, from_emb=False, from_token=False):
         self.data_path = data_path
         self.pad_seq_len = pad_seq_len
         self.use_AST, self.classify_btype = use_AST, classify_btype
         self.from_emb = from_emb
+        self.from_token = from_token
         self.data_pd = pd.read_csv(data_path, index_col=False, dtype='unicode', encoding='latin-1',
                                    low_memory=False).sample(frac=1)
         self.y_dev, self.y_btype = list(self.data_pd['FixedByID']), list(self.data_pd['Name'])
@@ -22,8 +23,9 @@ class TextCodeDataset(Dataset):
         self.x_context, self.x_AST = list(self.data_pd['Title_Description']), list(self.data_pd['AST'])
         self.x_context, self.x_AST = [str(x) for x in self.x_context], [str(x) for x in self.x_AST]
         self.x_context_emb, self.x_AST_emb = self.x_context, self.x_AST
+        self.x_context_token, self.x_AST_token = self.x_context, self.x_AST
 
-    def get_embeded(self, tokenizer, device, max_seq_len):
+    def get_embedded(self, tokenizer, device, max_seq_len):
         print('-' * 20 + 'embedding begin' + '-' * 20)
         emb_c, emb_a = torch.tensor([]).to(device), torch.tensor([]).to(device)
 
@@ -31,8 +33,8 @@ class TextCodeDataset(Dataset):
             batch_c = self.x_context_emb[i:i + 64]
             batch_a = self.x_AST_emb[i:i + 64]
 
-            batch_emb_c = get_word_embedding(batch_c, tokenizer, device, max_seq_len)
-            batch_emb_a = get_word_embedding(batch_a, tokenizer, device, max_seq_len)
+            batch_emb_c = get_sents_token_emb(batch_c, tokenizer, device, max_seq_len, mode="emb")
+            batch_emb_a = get_sents_token_emb(batch_a, tokenizer, device, max_seq_len, mode="emb")
 
             emb_c = torch.concat((emb_c, batch_emb_c))
             emb_a = torch.concat((emb_a, batch_emb_a))
@@ -42,6 +44,14 @@ class TextCodeDataset(Dataset):
         # self.x_context_emb = get_word_embedding(self.x_context_emb, tokenizer, device,max_seq_len)
         # self.x_AST_emb = get_word_embedding(self.x_AST_emb, tokenizer, device,max_seq_len)
         print('-' * 20 + 'embedding over' + '-' * 20)
+
+    def get_tokenized(self, tokenizer, device, max_seq_len):
+        print('-' * 20 + 'tokenize begin' + '-' * 20)
+
+        self.x_context_token = get_sents_token_emb(self.x_context_token, tokenizer, device, max_seq_len, mode="token")
+        self.x_AST_emb = get_sents_token_emb(self.x_AST_emb, tokenizer, device, max_seq_len, mode="token")
+
+        print('-' * 20 + 'tokenize over' + '-' * 20)
 
     def tokenize_input(self, tokenizer_C: Tokenizer, tokenizer_A: Tokenizer):
         self.x_context = tokenizer_C.texts_to_sequences(self.x_context)
@@ -62,10 +72,12 @@ class TextCodeDataset(Dataset):
         self.y_dev, self.y_btype = tensor_d, tensor_b
 
     def __getitem__(self, item):
-        if not self.from_emb:
-            input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
-        else:
+        if self.from_emb:
             input = self.x_context_emb[item], self.x_AST_emb[item] if self.use_AST else self.x_context_emb[item]
+        elif self.from_token:
+            input = self.x_context_token[item], self.x_AST_token[item] if self.use_AST else self.x_context_token[item]
+        else:
+            input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
         output = self.y_dev[item], self.y_btype[item] if self.classify_btype else self.y_dev[item]
         return input, output
 
