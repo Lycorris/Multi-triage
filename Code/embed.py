@@ -38,7 +38,7 @@ def get_sents_token_emb(sentences: list, pretrained_name: str, device, max_seq_l
     if mode == "token":
         return tokenized_sents
 
-    embedded_sentences = model(**tokenized_sents)[0]
+    embedded_sentences = model(tokenized_sents['input_ids'], tokenized_sents['attention_mask'])[0]
     if mode == "emb":
         return embedded_sentences
 

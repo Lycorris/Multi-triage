@@ -49,7 +49,7 @@ class TextCodeDataset(Dataset):
         print('-' * 20 + 'tokenize begin' + '-' * 20)
 
         self.x_context_token = get_sents_token_emb(self.x_context_token, tokenizer, device, max_seq_len, mode="token")
-        self.x_AST_emb = get_sents_token_emb(self.x_AST_emb, tokenizer, device, max_seq_len, mode="token")
+        self.x_AST_token = get_sents_token_emb(self.x_AST_token, tokenizer, device, max_seq_len, mode="token")
 
         print('-' * 20 + 'tokenize over' + '-' * 20)
 
@@ -75,7 +75,10 @@ class TextCodeDataset(Dataset):
         if self.from_emb:
             input = self.x_context_emb[item], self.x_AST_emb[item] if self.use_AST else self.x_context_emb[item]
         elif self.from_token:
-            input = self.x_context_token[item], self.x_AST_token[item] if self.use_AST else self.x_context_token[item]
+            if self.use_AST:
+                input = (self.x_context_token['input_ids'][item], self.x_context_token['attention_mask'][item]), (self.x_AST_token['input_ids'][item], self.x_AST_token['attention_mask'][item])  
+            else:  
+                input = (self.x_context_token['input_ids'][item], self.x_context_token['attention_mask'][item])
         else:
             input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
         output = self.y_dev[item], self.y_btype[item] if self.classify_btype else self.y_dev[item]
@@ -116,12 +119,16 @@ def map_dataset_output(train_dataset: TextCodeDataset, test_dataset: TextCodeDat
 
 
 if __name__ == '__main__':
-    train_path = 'Data/powershell/C_uA_Train.csv'
-    test_path = 'Data/powershell/C_uA_Test.csv'
+    train_path = '../Data/powershell/C_uA_Train.csv'
+    test_path = '../Data/powershell/C_uA_Test.csv'
+    TOKENIZER = 'Albert'
+    device = 'cuda'
     MAX_SEQ_LEN = 300
 
-    train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN)
-    test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN)
+    train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN, from_token=True)
+    train_dataset.get_tokenized(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+    test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN, from_token=True)
+    test_dataset.get_tokenized(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
 
     vocab_size = tokenize_dataset_input(train_dataset, test_dataset)
     idx2label = map_dataset_output(train_dataset, test_dataset)
@@ -129,7 +136,7 @@ if __name__ == '__main__':
 
     # print(vocab_size)  # [12513, 5910]
     # print(num_out)  # [396, 204]
-    print(len(train_dataset[0]))  # 2 表示输入和输出
+    print(train_dataset[0]) 
     print(len(train_dataset[0][0]))  # 2 表示x_context和x_AST
     print(train_dataset[0][0])  # 两个tensor 分别对应x_context和x_AST
     print(train_dataset[0][1])  # 两个tensor 分别对应y_dev和y_btype

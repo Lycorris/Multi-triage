@@ -4,20 +4,23 @@ import torch
 import json
 
 CONFIG = {
-    'batch_size': 64,
+    'batch_size': 16,
     'max_seq_len': 300,
 
     'from_emb': False,
+    'from_token': True,
     'vocab_size': [12513, 5910],
-    'emb_dim': 100,
+    'emb_dim': 768,
     'filter': [64, 64],
     'linear_concat': 50,
     'n_classes': [2, 2],
 
-    'train_path': 'Data/powershell/C_uA_Train.csv',
-    'test_path': 'Data/powershell/C_uA_Test.csv',
+    # 'train_path': '../Data/powershell/C_uA_Train.csv',
+    # 'test_path': '../Data/powershell/C_uA_Test.csv',
+    'train_path': '../Data/aspnet/trainAC40.csv',
+    'test_path': '../Data/aspnet/testAC40.csv',
     'learning_rate': 1e-3,
-    'epochs_num': 30,
+    'epochs_num': 10,
     'device': 'cuda' if torch.cuda.is_available() else 'cpu',
     'tokenizer_name': 'Albert',
     'loss_name': 'ASL',

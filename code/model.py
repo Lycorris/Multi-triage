@@ -85,8 +85,10 @@ class MetaModel(nn.Module):
         if self.from_emb:
             pass
         elif self.from_token:
-            x_C = self.pretrained_model(x_C)[0]
-            x_A = self.pretrained_model(x_A)[0]
+            x_C = self.pretrained_model(x_C[0], x_C[1])[0]
+            x_C = nn.Dropout()(x_C)
+            x_A = self.pretrained_model(x_A[0], x_A[1])[0]
+            x_C = nn.Dropout()(x_A)
         else:
             x_C = self.emb_C(x_C)
             x_A = self.emb_A(x_A)

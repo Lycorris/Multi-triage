@@ -69,8 +69,8 @@ device = CONFIG['device']
 
 ### train
 # dataset
-train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb)
-test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb)
+train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb, from_token=from_token)
+test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN, from_emb=from_emb, from_token=from_token)
 
 # TODO: optimize
 pretrained_model = None
@@ -106,7 +106,14 @@ if optimizer_name == 'Adam':
 def one_forward(data):
     (x_context, x_AST), (y_dev, y_btype) = data
     # print(x_context.shape, x_AST.shape)
-    y_dev_pred, y_btype_pred = model(x_context.to(device), x_AST.to(device))
+    # ids & attention_masks
+    if len(x_context) == 2:
+        x_context = (x_context[0].to(device), x_context[1].to(device))
+        x_AST = (x_AST[0].to(device), x_AST[1].to(device))
+    else:
+        x_context = x_context.to(device)
+        x_AST = x_AST.to(device)
+    y_dev_pred, y_btype_pred = model(x_context, x_AST)
     y = torch.concat((y_dev, y_btype), 1).to(device)
     y_pred = torch.concat((y_dev_pred, y_btype_pred), 1)
     loss = loss_fn(y_pred, y)
