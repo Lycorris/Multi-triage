@@ -3,24 +3,55 @@ import torch
 from torch.utils.data import Dataset
 from keras_preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tqdm import trange
+
+from embed import *
 
 
 class TextCodeDataset(Dataset):
-    def __init__(self, data_path, pad_seq_len, use_AST=True, classify_btype=True):
+    def __init__(self, data_path, pad_seq_len, use_AST=True, classify_btype=True, from_emb=False, from_token=False):
         self.data_path = data_path
         self.pad_seq_len = pad_seq_len
         self.use_AST, self.classify_btype = use_AST, classify_btype
-        # 读取Datafile, 返回删除格式错误的行，不用index列(不知为啥)，dtype=unicode，编码方式latin-1，low-memory避免数据类型不同的问题
-        # sample(frac = 1)打乱取全部(不懂，后面都按CreateDate排序了)
-        self.data_pd = pd.read_csv(data_path,
-                                   error_bad_lines=False, index_col=False, dtype='unicode', encoding='latin-1',
+        self.from_emb = from_emb
+        self.from_token = from_token
+        self.data_pd = pd.read_csv(data_path, index_col=False, dtype='unicode', encoding='latin-1',
                                    low_memory=False).sample(frac=1)
-        # print(self.data_pd.head(5))
         self.y_dev, self.y_btype = list(self.data_pd['FixedByID']), list(self.data_pd['Name'])
         self.y_dev, self.y_btype = [str(x).split('|') for x in self.y_dev], [str(x).split('|') for x in self.y_btype]
 
         self.x_context, self.x_AST = list(self.data_pd['Title_Description']), list(self.data_pd['AST'])
         self.x_context, self.x_AST = [str(x) for x in self.x_context], [str(x) for x in self.x_AST]
+        self.x_context_emb, self.x_AST_emb = self.x_context, self.x_AST
+        self.x_context_token, self.x_AST_token = self.x_context, self.x_AST
+
+    def get_embedded(self, tokenizer, device, max_seq_len):
+        print('-' * 20 + 'embedding begin' + '-' * 20)
+        emb_c, emb_a = torch.tensor([]).to(device), torch.tensor([]).to(device)
+
+        for i in trange(0, len(self.x_context_emb), 64):
+            batch_c = self.x_context_emb[i:i + 64]
+            batch_a = self.x_AST_emb[i:i + 64]
+
+            batch_emb_c = get_sents_token_emb(batch_c, tokenizer, device, max_seq_len, mode="emb")
+            batch_emb_a = get_sents_token_emb(batch_a, tokenizer, device, max_seq_len, mode="emb")
+
+            emb_c = torch.concat((emb_c, batch_emb_c))
+            emb_a = torch.concat((emb_a, batch_emb_a))
+            torch.cuda.empty_cache()
+
+        self.x_context_emb, self.x_AST_emb = emb_c, emb_a
+        # self.x_context_emb = get_word_embedding(self.x_context_emb, tokenizer, device,max_seq_len)
+        # self.x_AST_emb = get_word_embedding(self.x_AST_emb, tokenizer, device,max_seq_len)
+        print('-' * 20 + 'embedding over' + '-' * 20)
+
+    def get_tokenized(self, tokenizer, device, max_seq_len):
+        print('-' * 20 + 'tokenize begin' + '-' * 20)
+
+        self.x_context_token = get_sents_token_emb(self.x_context_token, tokenizer, device, max_seq_len, mode="token")
+        self.x_AST_token = get_sents_token_emb(self.x_AST_token, tokenizer, device, max_seq_len, mode="token")
+
+        print('-' * 20 + 'tokenize over' + '-' * 20)
 
     def tokenize_input(self, tokenizer_C: Tokenizer, tokenizer_A: Tokenizer):
         self.x_context = tokenizer_C.texts_to_sequences(self.x_context)
@@ -41,7 +72,15 @@ class TextCodeDataset(Dataset):
         self.y_dev, self.y_btype = tensor_d, tensor_b
 
     def __getitem__(self, item):
-        input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
+        if self.from_emb:
+            input = self.x_context_emb[item], self.x_AST_emb[item] if self.use_AST else self.x_context_emb[item]
+        elif self.from_token:
+            if self.use_AST:
+                input = (self.x_context_token['input_ids'][item], self.x_context_token['attention_mask'][item]), (self.x_AST_token['input_ids'][item], self.x_AST_token['attention_mask'][item])  
+            else:  
+                input = (self.x_context_token['input_ids'][item], self.x_context_token['attention_mask'][item])
+        else:
+            input = self.x_context[item], self.x_AST[item] if self.use_AST else self.x_context[item]
         output = self.y_dev[item], self.y_btype[item] if self.classify_btype else self.y_dev[item]
         return input, output
 
@@ -56,7 +95,7 @@ def tokenize_dataset_input(train_dataset: TextCodeDataset, test_dataset: TextCod
     tokenizer_A.fit_on_texts(train_dataset.x_AST + test_dataset.x_AST)
     train_dataset.tokenize_input(tokenizer_C, tokenizer_A)
     test_dataset.tokenize_input(tokenizer_C, tokenizer_A)
-    return [len(tokenizer_C.word_index), len(tokenizer_A.word_index)]
+    return [len(tokenizer_C.word_index) + 100, len(tokenizer_A.word_index) + 100]
 
 
 def map_dataset_output(train_dataset: TextCodeDataset, test_dataset: TextCodeDataset):
@@ -80,12 +119,16 @@ def map_dataset_output(train_dataset: TextCodeDataset, test_dataset: TextCodeDat
 
 
 if __name__ == '__main__':
-    train_path = 'Data/powershell/C_uA_Train.csv'
-    test_path = 'Data/powershell/C_uA_Test.csv'
+    train_path = '../Data/powershell/C_uA_Train.csv'
+    test_path = '../Data/powershell/C_uA_Test.csv'
+    TOKENIZER = 'Albert'
+    device = 'cuda'
     MAX_SEQ_LEN = 300
 
-    train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN)
-    test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN)
+    train_dataset = TextCodeDataset(train_path, pad_seq_len=MAX_SEQ_LEN, from_token=True)
+    train_dataset.get_tokenized(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
+    test_dataset = TextCodeDataset(test_path, pad_seq_len=MAX_SEQ_LEN, from_token=True)
+    test_dataset.get_tokenized(tokenizer=TOKENIZER, device=device, max_seq_len=MAX_SEQ_LEN)
 
     vocab_size = tokenize_dataset_input(train_dataset, test_dataset)
     idx2label = map_dataset_output(train_dataset, test_dataset)
@@ -93,18 +136,18 @@ if __name__ == '__main__':
 
     # print(vocab_size)  # [12513, 5910]
     # print(num_out)  # [396, 204]
-    print(len(train_dataset[0])) # 2 表示输入和输出
-    print(len(train_dataset[0][0])) # 2 表示x_context和x_AST
-    print(train_dataset[0][0]) #两个tensor 分别对应x_context和x_AST
-    print(train_dataset[0][1]) #两个tensor 分别对应y_dev和y_btype
-    #检查x_context的形状
-    print(train_dataset[0][0][0].shape) #torch.Size([300]) 
-    #检查x_AST的形状
-    print(train_dataset[0][0][1].shape) #torch.Size([300])
-    #检查y_dev的形状
-    print(train_dataset[0][1][0].shape) #torch.Size([396]) 
-    #检查y_btype的形状
-    print(train_dataset[0][1][1].shape) #torch.Size([204])
+    print(train_dataset[0]) 
+    print(len(train_dataset[0][0]))  # 2 表示x_context和x_AST
+    print(train_dataset[0][0])  # 两个tensor 分别对应x_context和x_AST
+    print(train_dataset[0][1])  # 两个tensor 分别对应y_dev和y_btype
+    # 检查x_context的形状
+    print(train_dataset[0][0][0].shape)  # torch.Size([300])
+    # 检查x_AST的形状
+    print(train_dataset[0][0][1].shape)  # torch.Size([300])
+    # 检查y_dev的形状
+    print(train_dataset[0][1][0].shape)  # torch.Size([396])
+    # 检查y_btype的形状
+    print(train_dataset[0][1][1].shape)  # torch.Size([204])
     # train_dataset[0]
     # ((tensor([[100, 64, 383, ..., 0, 0, 0],
     #           [2035, 606, 105, ..., 0, 0, 0],
