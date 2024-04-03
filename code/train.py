@@ -97,6 +97,12 @@ if model_name == 'TextCNN':
 # loss_func
 if loss_name == 'ASL':
     loss_fn = AsymmetricLossOptimized().to(device)
+elif loss_name == 'BCE&MSE':
+    loss_fn = BCEWithMSELoss().to(device)
+elif loss_name == 'C-BCE':
+    loss_fn = CustomizedBCELoss().to(device)
+elif loss_name == 'BCE-Lg':
+    loss_fn = nn.BCEWithLogitsLoss().to(device)
 
 # optimizer
 if optimizer_name == 'Adam':
@@ -132,7 +138,8 @@ def one_backward(optimizer, loss):
 # torch.autograd.set_detect_anomaly(True)
 # scaler = torch.cuda.amp.GradScaler()
 
-writer = SummaryWriter('./tf-logs')
+# TODO: config --logdir
+writer = SummaryWriter('../../../tf-logs')
 for epoch in trange(EPOCH):
 
     # train
@@ -176,4 +183,5 @@ for epoch in trange(EPOCH):
     # if epoch % 20 == 0:
     #   torch.save(model, '../savedmodel/model_epoch{}.pth'.format(epoch))
 
+# torch.save(model, 'savedmodel/model_epoch{}.pth'.format(epoch))
 writer.close()

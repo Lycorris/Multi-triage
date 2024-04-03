@@ -11,6 +11,9 @@ def get_tokenizer_models(pretrained_name, device):
         tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
         model = AlbertModel.from_pretrained('albert-base-v2').to(device)
     elif pretrained_name == "Bert":
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        model = BertModel.from_pretrained('bert-base-uncased').to(device)
+    elif pretrained_name == "Bert-L":
         tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
         model = BertModel.from_pretrained('bert-large-uncased').to(device)
     elif pretrained_name == "RoBerta":

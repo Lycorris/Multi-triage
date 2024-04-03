@@ -20,7 +20,7 @@ class BCEWithMSELoss(nn.Module):
     a weight_MSE of *0.5 ~ 0.8* is recommended.
     """
 
-    def __init__(self, weight_BCE=0.3, weight_MSE=0.7, sigmoid=True, *args, **kwargs):
+    def __init__(self, weight_BCE=0.2, weight_MSE=0.8, sigmoid=True, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.weight_BCE = weight_BCE
         self.weight_MSE = weight_MSE
