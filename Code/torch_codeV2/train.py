@@ -26,28 +26,34 @@ def precess_data(x, y, device):
 
 
 def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi-triage',
-              _num_epochs=20, _bsz=8, _lr=3e-5,
-              _ckpt='bert-base-uncased', _code_ckpt='codebert-base',
+              _num_epochs=20, _bsz=4, _lr=3e-5,
+              _ckpt='../bert-base-uncased', _code_ckpt='../codebert-base', use_AST=False,
               device='cuda' if torch.cuda.is_available() else 'cpu'):
     """
-        _code_format = 'None'  -> ignore Code Snippet
+        _code_format =  'None'  -> ignore Code Snippet
                         'Front' -> add Code BEFORE Text
                         'Back'  -> add Code BEHIND Text
                         'Separate' -> consider Code as an independent input
-        _model_type =  'Multi-triage'
+                        'raw'   -> add the original Code Snippet
+        _model_type =   'Multi-triage'
                         'PreTrain'
     """
+    res = []
     # DATASET Read Data: extract data
     dataset = pd.read_csv(_path)
+
+    # 缩小数据集
+    # dataset = dataset[:50]
+
     dataset = dataset.rename(
         columns={'Title_Description': 'Context', 'AST': 'AST', 'FixedByID': 'Dev', 'Name': 'Btype'})
-    dataset = dataset[['Context', 'AST', 'Dev', 'Btype']]
+    dataset = dataset[['Context', 'AST', 'Dev', 'Btype', 'raw_Title_Description']]
 
     # DATASET Output: convert label to tensor
-    dataset, D_ids2token, B_ids2token = label_vectorize(dataset)
+    dataset, D_ids2token, B_ids2token = label_vectorize(dataset, codeFormat=_code_format, use_AST=use_AST)
     n_classes = [len(D_ids2token), len(B_ids2token)]
     # log
-    logname = '../res_log/' + _logname + '.txt'
+    logname = '../../res_log/' + _logname + '.txt'
     logstr = _logname + '\\n' + '-' * 60 + '\\n' + 'dataset shape:{}\nn_classes: {}'.format(dataset.shape,
                                                                                             n_classes) + '-' * 60 + '\n\n'
     print('dataset shape:{}\nn_classes: {}'.format(dataset.shape, n_classes))
@@ -110,24 +116,28 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi
         logstr += '-' * 60 + '{}th epoch\n val_loss: {}\n val_acc:{}\n val_f1: {}\n'.format(epoch, val_metric[0],
                                                                                             val_metric[1:3],
                                                                                             val_metric[3:])
+        if epoch % 5 == 4:
+            # test
+            model.eval()
+            test_metric = [0.0] * 5
+            for x, y in tqdm(test_dataloader):
+                x_C, x_A, y = precess_data(x, y, device)
+                outputs = model(x_C, x_A)
+                loss = loss_fn(outputs, y.float())
 
-    # test
-    model.eval()
-    test_metric = [0.0] * 5
-    for x, y in tqdm(test_dataloader):
-        x_C, x_A, y = precess_data(x, y, device)
-        outputs = model(x_C, x_A)
-        loss = loss_fn(outputs, y.float())
+                metric = metrics(y, outputs, split_pos=n_classes)
+                test_metric = update_metric(test_metric, loss, metric, len(test_dataloader))
 
-        metric = metrics(y, outputs, split_pos=n_classes)
-        test_metric = update_metric(test_metric, loss, metric, len(test_dataloader))
-
-    logstr += '-' * 60 + '\ntest_loss: {}\n test_acc:{}\n test_f1: {}'.format(test_metric[0], test_metric[1:3],
-                                                                              test_metric[3:])
-    print('test_loss: {}\n test_acc:{}\n test_f1: {}'.format(test_metric[0], test_metric[1:3], test_metric[3:]))
+            logstr += '-' * 60 + '\ntest_loss: {}\n test_acc:{}\n test_f1: {}'.format(test_metric[0], test_metric[1:3],
+                                                                                      test_metric[3:])
+            print('test_loss: {}\n test_acc:{}\n test_f1: {}'.format(test_metric[0], test_metric[1:3], test_metric[3:]))
+            res.append(test_metric[3:])
 
     with open(logname, 'w') as f:
         f.write(logstr)
+
+    # Return f1 result of test set(2 heads)
+    return res
 
 
 if __name__ == '__main__':

@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from transformers import AlbertModel, BertForSequenceClassification
 from transformers import AutoModel, AutoModelForSequenceClassification
 
 """
@@ -36,9 +35,9 @@ class PretrainModel(nn.Module):
         self.use_AST = use_AST
 
         self.text_model = AutoModelForSequenceClassification.from_pretrained(
-            text_ckpt, num_labels=self.n, problem_type="multi_label_classification")
+            text_ckpt, num_labels=self.n, problem_type="multi_label_classification",local_files_only=True)
         self.code_model = AutoModelForSequenceClassification.from_pretrained(
-            code_ckpt, num_labels=self.n, problem_type="multi_label_classification") if use_AST else None
+            code_ckpt, num_labels=self.n, problem_type="multi_label_classification",local_files_only=True) if use_AST else None
 
         self.fc = nn.Sequential(
             nn.BatchNorm1d(2 * self.n, affine=False),
@@ -79,9 +78,9 @@ class PreTrainModel2Stage(nn.Module):
         self.use_AST = use_AST
 
         self.text_model = AutoModel.from_pretrained(
-            text_ckpt, hidden_size=n_emb_dim)
+            text_ckpt, hidden_size=n_emb_dim,local_files_only=True)
         self.code_model = AutoModel.from_pretrained(
-            code_ckpt, hidden_size=n_emb_dim) if use_AST else None
+            code_ckpt, hidden_size=n_emb_dim,local_files_only=True) if use_AST else None
 
         self.fc = nn.Sequential(
             nn.BatchNorm1d(2 * self.n, affine=False),
@@ -175,6 +174,7 @@ class MetaModel(nn.Module):
 
 
 if __name__ == '__main__':
+    from transformers import AlbertModel
     # Sanity Test
     Batch_sz = 64
     MAX_SEQ_LEN = 300

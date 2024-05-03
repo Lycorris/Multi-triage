@@ -28,13 +28,13 @@ def onehot(labels, token2ids):
     return vec
 
 
-def label_vectorize(data):
+def label_vectorize(data, codeFormat='None', use_AST=False):
     # avoid NaN in dataset
     data['Context'].fillna('[UNK]', inplace=True)
     data['AST'].fillna('[UNK]', inplace=True)
     data['Dev'].fillna('unknown', inplace=True)
     data['Btype'].fillna('unknown', inplace=True)
-
+    
     D_labels = [label.split(label_split_token) for label in data['Dev']]
     _D_ids2token, D_token2ids = get_map(D_labels)
     data['Dev_vec'] = data['Dev'].map(partial(onehot, token2ids=D_token2ids))
@@ -65,13 +65,15 @@ def text_tensorize(data, _ckpt, _code_format):
     """
     # obtain tokenizer
     check_point = _ckpt
-    tokenizer = AutoTokenizer.from_pretrained(check_point)
+    tokenizer = AutoTokenizer.from_pretrained(check_point,local_files_only=True)
     # process code
     # TODO: sanity check
     if _code_format == 'Front':
         data['Context'] = data['AST'] + data['Context']
     elif _code_format == 'Back':
         data['Context'] = data['Context'] + data['AST']
+    elif _code_format == 'raw':
+        data['Context'] = data['raw_Title_Description']
     # dataset tensorize
     data['x_C'] = data['Context'].map(partial(tokenize_function, tokenizer))
     data['x_A'] = data['AST'].map(partial(tokenize_function, tokenizer))
