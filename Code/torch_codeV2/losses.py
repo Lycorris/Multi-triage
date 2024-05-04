@@ -13,7 +13,7 @@ class SparceBCELoss(nn.Module):
     which enable the loss to focus more on the performance of positive samples' prediction
     """
 
-    def __init__(self, avg_label_types, total_label_types, miu=250, sigma=550, *args, **kwargs):
+    def __init__(self, avg_label_types, total_label_types, miu=600, sigma=800, *args, **kwargs):
         super().__init__(*args, **kwargs)
         label_types_ratio = total_label_types / avg_label_types
         z = (label_types_ratio + miu) / sigma
