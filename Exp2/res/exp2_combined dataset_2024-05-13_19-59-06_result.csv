@@ -1,0 +1,7 @@
+train_method,loss_type,model_type,code_format,proj_name,epoch,res1,res2
+NaiveTraining,BCE, Bert,raw,exp2:combined dataset,5,0.0,0.0
+NaiveTraining,BCE, Bert,raw,exp2:combined dataset,10,0.0,0.0
+NaiveTraining,SBCE, Bert,raw,exp2:combined dataset,5,0.0,0.0
+NaiveTraining,SBCE, Bert,raw,exp2:combined dataset,10,0.0,0.0
+NaiveTraining,ASL, Bert,raw,exp2:combined dataset,5,0.0,0.04089496218055744
+NaiveTraining,ASL, Bert,raw,exp2:combined dataset,10,0.059651729812129864,0.19543076102235565
