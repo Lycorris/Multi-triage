@@ -35,10 +35,9 @@ class PretrainModel(nn.Module):
         self.use_AST = use_AST
 
         self.text_model = AutoModelForSequenceClassification.from_pretrained(
-            text_ckpt, num_labels=self.n, problem_type="multi_label_classification", local_files_only=True)
+            text_ckpt, num_labels=self.n, problem_type="multi_label_classification",local_files_only=True)
         self.code_model = AutoModelForSequenceClassification.from_pretrained(
-            code_ckpt, num_labels=self.n, problem_type="multi_label_classification",
-            local_files_only=True) if use_AST else None
+            code_ckpt, num_labels=self.n, problem_type="multi_label_classification",local_files_only=True) if use_AST else None
 
         self.fc = nn.Sequential(
             nn.BatchNorm1d(2 * self.n, affine=False),
@@ -68,7 +67,7 @@ class PretrainModel(nn.Module):
 
 # TODO: Sanity Check
 class PreTrainModel2Stage(nn.Module):
-    def __init__(self, text_ckpt, code_ckpt, n_classes, n_emb_dim=768, use_AST=True):
+    def __init__(self, text_ckpt, code_ckpt, n_classes, n_emb_dim=768, n_linear_concat=1000, use_AST=True):
         super().__init__()
         self.text_ckpt = text_ckpt
         self.code_ckpt = code_ckpt
@@ -77,14 +76,17 @@ class PreTrainModel2Stage(nn.Module):
         self.n_D = n_classes[0]
         self.n_B = n_classes[1]
         self.use_AST = use_AST
+        self.n_linear_concat = n_linear_concat
+        self.hidden_size = 768
 
+        # hidden_size % 12 should be 0
         self.text_model = AutoModel.from_pretrained(
-            text_ckpt, hidden_size=n_emb_dim, local_files_only=True)
+            text_ckpt, hidden_size=self.hidden_size,local_files_only=True)
         self.code_model = AutoModel.from_pretrained(
-            code_ckpt, hidden_size=n_emb_dim, local_files_only=True) if use_AST else None
+            code_ckpt, hidden_size=self.hidden_size,local_files_only=True) if use_AST else None
 
         self.fc = nn.Sequential(
-            nn.BatchNorm1d(2 * self.n, affine=False),
+            nn.BatchNorm1d(2 * self.hidden_size, affine=False),
             nn.Dropout(0.5),
             nn.Linear(2 * self.n, self.n_emb_dim),
             nn.ReLU()
@@ -92,6 +94,7 @@ class PreTrainModel2Stage(nn.Module):
 
         self.fc_D = nn.Linear(self.n_linear_concat, self.n_D)
         self.fc_B = nn.Linear(self.n_linear_concat, self.n_B)
+     
 
     def forward(self, x_C, x_A, stage):
         x_C = self.text_model(x_C['input_ids'].squeeze(dim=1), x_C['attention_mask'].squeeze(dim=1))[0]
@@ -176,7 +179,6 @@ class MetaModel(nn.Module):
 
 if __name__ == '__main__':
     from transformers import AlbertModel
-
     # Sanity Test
     Batch_sz = 64
     MAX_SEQ_LEN = 300

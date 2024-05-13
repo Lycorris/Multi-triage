@@ -25,6 +25,7 @@ class SparceBCELoss(nn.Module):
         x = nn.Sigmoid()(x)
         loss_pos = y * torch.log(x)
         loss_neg = (1 - y) * torch.log(1 - x)
+        # loss = 0.8*loss_pos + 0.2*loss_neg
         loss = self.weight_pos * loss_pos + self.weight_neg * loss_neg
         return -torch.sum(loss)
 
