@@ -19,19 +19,20 @@ pathList = [
      '../Data/golang.csv', '../Data/grpc.csv',
      '../Data/pytorch.csv', '../Data/spring-framework.csv',
      '../Data/TensorFlow.csv',], 
-     'exp2:combined_dataset', 4, 2600) # TODO: avg_label, total_label, len
+     'exp2_combined_dataset', 4, 2600) # TODO: avg_label, total_label, len
 ]
 
 lossList = [
-    (nn.BCEWithLogitsLoss(), 'BCE'),
-    ('SparceBCELoss', 'SBCE'),
-    (AsymmetricLossOptimized(), 'ASL'),
+    # (nn.BCEWithLogitsLoss(), 'BCE'),
+    # ('SparceBCELoss', 'SBCE'),
+    # (AsymmetricLossOptimized(), 'ASL'),
+    (FocalLoss(), 'Focal'),
 ]
 # TODO: Roberta, albert, coderbert
 # TODO: XLnet
 ckptList = [
-    # ('bert-base-uncased', 'Multi-triage', 20),  # just for tokenize
-    ('bert-base-uncased', ' Bert', 10),
+    ('bert-base-uncased', 'Multi-triage', 20),  # just for tokenize
+    # ('bert-base-uncased', ' Bert', 10),
     # ('roberta-base', 'Robert', 10),
     # ('albert-base-v2', 'albert', 10),
     # ('codebert-base', 'codebert', 10),
@@ -47,7 +48,7 @@ codeFormatList = [
 ]
 
 # result_col for each dataset
-res_columns = ['train_method', 'loss_type', 'model_type', 'code_format', 'proj_name', 'epoch', 'res1', 'res2']
+res_columns = ['train_method', 'loss_type', 'model_type', 'code_format', 'proj_name', 'epoch', 'f1_d', 'f1_b','acc@1_d', 'acc@2_d', 'acc@3_d', 'acc@5_d', 'acc@10_d', 'acc@20_d', 'acc@1_b', 'acc@2_b', 'acc@3_b', 'acc@5_b', 'acc@10_b', 'acc@20_b']
 
 for path in pathList:
     # create 'res_DataFrame' for each dataset
@@ -72,7 +73,7 @@ for path in pathList:
                     # save f1-score 'for each head(dev&btype)' 'for every 5 epoch'
                     for i, res in enumerate(ress):
                         print(res)
-                        result.loc[result.shape[0]] = ['NaiveTraining', loss[1], ckpt[1], code_format, path[1], 5 * (i + 1), res[0], res[1]]
+                        result.loc[result.shape[0]] = ['NaiveTraining', loss[1], ckpt[1], code_format, path[1], 5 * (i + 1), res[3], res[4], res[5], res[6], res[7], res[8], res[9], res[10], res[11], res[12], res[13], res[14], res[15], res[16]]
                 # except Exception as e:
                     # print(e)
                 else:

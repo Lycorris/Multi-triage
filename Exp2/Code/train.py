@@ -8,6 +8,7 @@ from model import *
 from losses import *
 from metrics import *
 
+NUM_METRICS = 17
 
 def update_metric(hist_metric, loss, metric, l):
     hist_metric[0] += loss.item() / l
@@ -15,6 +16,18 @@ def update_metric(hist_metric, loss, metric, l):
     hist_metric[2] += metric['acc'][1] / l
     hist_metric[3] += metric['F1'][0] / l
     hist_metric[4] += metric['F1'][1] / l
+    hist_metric[5] += metric['acc@1_d'] / l
+    hist_metric[6] += metric['acc@2_d'] / l
+    hist_metric[7] += metric['acc@3_d'] / l
+    hist_metric[8] += metric['acc@5_d'] / l
+    hist_metric[9] += metric['acc@10_d'] / l
+    hist_metric[10] += metric['acc@20_d'] / l
+    hist_metric[11] += metric['acc@1_b'] / l
+    hist_metric[12] += metric['acc@2_b'] / l
+    hist_metric[13] += metric['acc@3_b'] / l
+    hist_metric[14] += metric['acc@5_b'] / l
+    hist_metric[15] += metric['acc@10_b'] / l
+    hist_metric[16] += metric['acc@20_b'] / l
     return hist_metric
 
 
@@ -28,7 +41,7 @@ def precess_data(x, y, device):
 def test_process(model, test_dataloader, loss_fn, n_classes,
                  device='cuda' if torch.cuda.is_available() else 'cpu'):
     model.eval()
-    test_metric = [0.0] * 5
+    test_metric = [0.0] * NUM_METRICS
     for x, y in tqdm(test_dataloader):
         x_C, x_A, y = precess_data(x, y, device)
         outputs = model(x_C, x_A)
@@ -58,24 +71,24 @@ def train_process(model, train_dataloader, loss_fn, optimizer, lr_scheduler,
 
     return train_loss
 
-
+# TODO: more metrics to be added
 def update_logstr(log_str, epoch=None, train_loss=None, val_metric=None, t=None,
                   test_metric=None, avg_test_metric=None):
     if train_loss is not None:
         sub_str = '{}th epoch\n train_loss: {}\n'.format(epoch, train_loss)
     if val_metric is not None:
         sub_str = ('-' * 60 + '{}th epoch\n val_loss: {}\n val_acc:{}\n val_f1: {}\n'.
-                    format(epoch, val_metric[0], val_metric[1:3], val_metric[3:]))
+                    format(epoch, val_metric[0], val_metric[1:3], val_metric[3:5]))
     if t is not None:
         sub_str = '-' * 60 + f'TESTSET{t}' + '-' * 60 + '\n'
         sub_str += ('-' * 60 + '\ntest_loss: {}\n test_acc:{}\n test_f1: {}'.
-                    format(test_metric[0], test_metric[1:3], test_metric[3:]))
+                    format(test_metric[0], test_metric[1:3], test_metric[3:5]))
         print(sub_str)
         log_str += sub_str
     if avg_test_metric is not None:
         sub_str = '-' * 60 + f'ALLTESTSET' + '-' * 60 + '\n'
         sub_str += ('-' * 60 + '\ntest_loss: {}\n test_acc:{}\n test_f1: {}'.
-                    format(avg_test_metric[0], avg_test_metric[1:3], avg_test_metric[3:]))
+                    format(avg_test_metric[0], avg_test_metric[1:3], avg_test_metric[3:5]))
         print(sub_str)
 
     log_str += sub_str
@@ -98,6 +111,9 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi
     """
     # Dataset Preprocess on Input & Output
     datasets, (D_ids2token, B_ids2token) = dataset_preprocess_multi_repo(_path, _code_format, _ckpt)
+
+    # small dataset
+    datasets = datasets[:100]
 
     # DATASET Format: split train/val/test dataset and wrap into dataloader
     train_dataloader, val_dataloader, test_dataloaders = \
@@ -147,7 +163,7 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi
         logstr = update_logstr(logstr, epoch=epoch, train_loss=None, val_metric=val_metric)
 
         if epoch % 5 == 4:
-            avg_test_metric = [0.0] * 5
+            avg_test_metric = [0.0] * NUM_METRICS
             t_ds_len = sum([len(t_d) for t_d in test_dataloaders])
             for t, test_dataloader in enumerate(test_dataloaders):
                 test_metric = test_process(model, test_dataloader, loss_fn, n_classes)
@@ -156,7 +172,7 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi
                 logstr = update_logstr(logstr, t=t, test_metric=test_metric)
 
             logstr = update_logstr(logstr, avg_test_metric=avg_test_metric)
-            res.append(avg_test_metric[3:])
+            res.append(avg_test_metric)
             if exp == 2:
                 torch.save(model, f'../model_ckpts/{epoch}th_epoch_' + model_path)  # 保存模型
                 # net_ = torch.load(pth) # 读取模型
@@ -164,7 +180,7 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi
     with open(logname, 'w') as f:
         f.write(logstr)
 
-    # Return f1 result of test set(2 heads)
+    # Return metrics
     return res
 
 

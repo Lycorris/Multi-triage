@@ -1,11 +1,57 @@
 import numpy as np
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 '''
-    losses: BCE, CustomizedBCELoss, AsymmetricLossOptimized
+    losses: BCE, SparceBCELoss, FocalLoss, AsymmetricLossOptimized, SupConLoss
 '''
 
+# TODO: find original paper and calculate to prove the correctness of the loss function
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2, reduction='mean'):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        p = torch.sigmoid(inputs)
+        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        p_t = p * targets + (1 - p) * (1 - targets)
+        loss = ce_loss * ((1 - p_t) ** self.gamma)
+
+        if self.alpha >= 0:
+            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
+            loss = alpha_t * loss
+
+        if self.reduction == "none":
+            pass
+        elif self.reduction == "mean":
+            loss = loss.mean()
+        elif self.reduction == "sum":
+            loss = loss.sum()
+        else:
+            raise ValueError(
+                f"Invalid Value for arg 'reduction': '{self.reduction}' \n Supported reduction modes: 'none', 'mean', 'sum'"
+            )
+        return loss
+
+
+class WeightedFocalLoss(nn.Module):
+    "Non weighted version of Focal Loss"
+    def __init__(self, alpha=.25, gamma=2):
+        super(WeightedFocalLoss, self).__init__()
+        self.alpha = torch.tensor([alpha, 1-alpha]).cuda()
+        self.gamma = gamma
+
+    def forward(self, inputs, targets):
+        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        targets = targets.type(torch.long)
+        at = self.alpha.gather(0, targets.data.view(-1))
+        pt = torch.exp(-BCE_loss)
+        F_loss = at*(1-pt)**self.gamma * BCE_loss
+        return F_loss.mean()
 
 class SparceBCELoss(nn.Module):
     """
@@ -189,3 +235,22 @@ class SupConLoss(nn.Module):
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
+
+if __name__ == '__main__':
+    print('hyperparameters: alpha=0.25, gamma=2, reduction=mean')
+    # Test cases for focal loss
+    # test case 1
+    y = torch.tensor([1, 0, 1, 0, 1]).float()
+    pred = torch.tensor([0.9, 0.1, 0.9, 0.1, 0.9])
+    loss_fn = FocalLoss()
+    loss = loss_fn(pred, y)
+    print(f'Case1 Focal Loss: {loss.item()}')
+    loss_fn = WeightedFocalLoss()
+    loss = loss_fn(pred, y)
+    print(f'Case1 Focal Loss: {loss.item()}')
+    # test case 2
+    y = torch.tensor([1, 0, 1, 0, 1]).float()
+    pred = torch.tensor([0.1, 0.9, 0.1, 0.9, 0.1])
+    loss_fn = FocalLoss()
+    loss = loss_fn(pred, y)
+    print(f'Case2 Focal Loss: {loss.item()}')
