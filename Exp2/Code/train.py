@@ -16,7 +16,7 @@ def update_metric(hist_metric, metric, l):
     # a(acc), p(precision), r(recall), F(F1)
     # acc @ (1, 2, 3, 5, 10, 20)
     hist_metric = {
-        k: v + (metric[k] / l)
+        k: (v[0] + (metric[k][0] / l), v[1] + (metric[k][1] / l))
         for k, v in hist_metric.items()
     }
     return hist_metric
@@ -32,7 +32,7 @@ def precess_data(x, y, device):
 def test_process(model, test_dataloader, loss_fn, n_classes,
                  device='cuda' if torch.cuda.is_available() else 'cpu'):
     model.eval()
-    test_metric = {k: 0.0 for k in METRICS_NAME}
+    test_metric = {k: (0.0,0.0) for k in METRICS_NAME}
     for x, y in tqdm(test_dataloader):
         x_C, x_A, y = precess_data(x, y, device)
         outputs = model(x_C, x_A)
@@ -99,9 +99,6 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi
     # Dataset Preprocess on Input & Output
     datasets, (D_ids2token, B_ids2token) = dataset_preprocess_multi_repo(_path, _code_format, _ckpt)
 
-    # small dataset
-    datasets = datasets[:100]
-
     # DATASET Format: split train/val/test dataset and wrap into dataloader
     train_dataloader, val_dataloader, test_dataloaders = \
         split_and_wrap_dataset_multi_repo(datasets, _bsz)
@@ -150,11 +147,11 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi
         logstr = update_logstr(logstr, epoch=epoch, train_loss=None, val_metric=val_metric)
 
         if epoch % 5 == 4:
-            avg_test_metric = {k: 0.0 for k in METRICS_NAME}
+            avg_test_metric = {k: (0.0,0.0) for k in METRICS_NAME}
             t_ds_len = sum([len(t_d) for t_d in test_dataloaders])
             for t, test_dataloader in enumerate(test_dataloaders):
                 test_metric = test_process(model, test_dataloader, loss_fn, n_classes)
-                avg_test_metric = {k: v + test_metric[k] * len(test_dataloader) / t_ds_len
+                avg_test_metric = {k: (v[0] + test_metric[k][0] * len(test_dataloader) / t_ds_len, v[1] + test_metric[k][1] * len(test_dataloader))
                                    for k, v in avg_test_metric.items()}
                 logstr = update_logstr(logstr, t=t, test_metric=test_metric)
 

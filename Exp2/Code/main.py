@@ -59,7 +59,6 @@ for path in pathList:
         for loss in lossList:
             for code_format in codeFormatList:
                 # try:
-                try:
                     # obtain loss_fn & model_type
                     loss_fn = loss[0] if loss[1] != 'SBCE' else SparceBCELoss(avg_label_types=path[2],
                                                                               total_label_types=path[3])
@@ -81,8 +80,8 @@ for path in pathList:
                                 res_val += [v[0], v[1]]
                         result.loc[result.shape[0]] = ['NaiveTraining', loss[1], ckpt[1], code_format,
                                                        path[1], 5 * (i + 1)] + res_val
-                except Exception as e:
-                    print(e)
+                # except Exception as e:
+                #     print(e)
         # save 'res_DataFrame' for each dataset
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         result.to_csv(f'../res/{path[1]}_{now}_result.csv', index=False)

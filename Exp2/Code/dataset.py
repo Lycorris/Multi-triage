@@ -111,7 +111,7 @@ def dataset_preprocess(_path, _code_format, _ckpt):
     dataset = pd.read_csv(_path)
 
     # 缩小数据集
-    # dataset = dataset[:50]
+    dataset = dataset[:50]
 
     dataset = dataset.rename(
         columns={'Title_Description': 'Context', 'AST': 'AST', 'FixedByID': 'Dev', 'Name': 'Btype'})
@@ -160,6 +160,8 @@ def dataset_preprocess_multi_repo(_paths, _code_format, _ckpt):
     zips = [dataset_preprocess(_path, _code_format, _ckpt) for _path in _paths]
 
     datasets = [z[0] for z in zips]
+
+
     D_ids2tokens, B_ids2tokens = [z[1][0] for z in zips], [z[1][1] for z in zips]
 
     D_ids2token = list(set([D for D_ids2token in D_ids2tokens for D in D_ids2token]))
