@@ -41,7 +41,8 @@ def confusion_matrix(y: torch.Tensor, pred: torch.Tensor, threshold: float = 0.5
 
 def metrics(y, pred, split_pos, threshold=0.5, from_logits=True, topK=(1, 2, 3, 5, 10, 20)):
     """
-        TODO:
+        a(acc), p(precision), r(recall), F(F1)
+        acc@(1, 2, 3, 5, 10, 20)
     """
     res = []
     metric_name = []

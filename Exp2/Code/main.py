@@ -48,7 +48,9 @@ codeFormatList = [
 ]
 
 # result_col for each dataset
-res_columns = ['train_method', 'loss_type', 'model_type', 'code_format', 'proj_name', 'epoch', 'f1_d', 'f1_b','acc@1_d', 'acc@2_d', 'acc@3_d', 'acc@5_d', 'acc@10_d', 'acc@20_d', 'acc@1_b', 'acc@2_b', 'acc@3_b', 'acc@5_b', 'acc@10_b', 'acc@20_b']
+res_columns = ['train_method', 'loss_type', 'model_type', 'code_format',
+               'proj_name', 'epoch',
+               'f1_d', 'f1_b','acc@1_d', 'acc@2_d', 'acc@3_d', 'acc@5_d', 'acc@10_d', 'acc@20_d', 'acc@1_b', 'acc@2_b', 'acc@3_b', 'acc@5_b', 'acc@10_b', 'acc@20_b']
 
 for path in pathList:
     # create 'res_DataFrame' for each dataset
@@ -57,7 +59,7 @@ for path in pathList:
         for loss in lossList:
             for code_format in codeFormatList:
                 # try:
-                if True:
+                try:
                     # obtain loss_fn & model_type
                     loss_fn = loss[0] if loss[1] != 'SBCE' else SparceBCELoss(avg_label_types=path[2],
                                                                               total_label_types=path[3])
@@ -73,11 +75,14 @@ for path in pathList:
                     # save f1-score 'for each head(dev&btype)' 'for every 5 epoch'
                     for i, res in enumerate(ress):
                         print(res)
-                        result.loc[result.shape[0]] = ['NaiveTraining', loss[1], ckpt[1], code_format, path[1], 5 * (i + 1), res[3], res[4], res[5], res[6], res[7], res[8], res[9], res[10], res[11], res[12], res[13], res[14], res[15], res[16]]
-                # except Exception as e:
-                    # print(e)
-                else:
-                    continue
+                        res_val = []
+                        for k, v in res.items():
+                            if 'F1' in k or '@' in k:
+                                res_val += [v[0], v[1]]
+                        result.loc[result.shape[0]] = ['NaiveTraining', loss[1], ckpt[1], code_format,
+                                                       path[1], 5 * (i + 1)] + res_val
+                except Exception as e:
+                    print(e)
         # save 'res_DataFrame' for each dataset
         now = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         result.to_csv(f'../res/{path[1]}_{now}_result.csv', index=False)
