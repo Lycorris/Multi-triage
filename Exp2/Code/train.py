@@ -40,6 +40,10 @@ def test_process(model, test_dataloader, loss_fn, n_classes,
 
         metric = metrics(y, outputs, split_pos=n_classes)
         test_metric = update_metric(test_metric, metric, len(test_dataloader))
+        for k,v in test_metric.items():
+            if v[0] < 1 and v[1] < 1:
+                continue
+            print(f"{k}: {v}")
 
     return test_metric
 
@@ -151,7 +155,8 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None', _model_type='Multi
             t_ds_len = sum([len(t_d) for t_d in test_dataloaders])
             for t, test_dataloader in enumerate(test_dataloaders):
                 test_metric = test_process(model, test_dataloader, loss_fn, n_classes)
-                avg_test_metric = {k: (v[0] + test_metric[k][0] * len(test_dataloader) / t_ds_len, v[1] + test_metric[k][1] * len(test_dataloader))
+                avg_test_metric = {k: (v[0] + test_metric[k][0] * len(test_dataloader) / t_ds_len, 
+                                       v[1] + test_metric[k][1] * len(test_dataloader) / t_ds_len)
                                    for k, v in avg_test_metric.items()}
                 logstr = update_logstr(logstr, t=t, test_metric=test_metric)
 

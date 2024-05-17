@@ -50,7 +50,7 @@ codeFormatList = [
 # result_col for each dataset
 res_columns = ['train_method', 'loss_type', 'model_type', 'code_format',
                'proj_name', 'epoch',
-               'f1_d', 'f1_b','acc@1_d', 'acc@2_d', 'acc@3_d', 'acc@5_d', 'acc@10_d', 'acc@20_d', 'acc@1_b', 'acc@2_b', 'acc@3_b', 'acc@5_b', 'acc@10_b', 'acc@20_b']
+               'f1_d', 'f1_b','acc@1_d', 'acc@1_b', 'acc@2_d', 'acc@2_b', 'acc@3_d', 'acc@3_b', 'acc@5_d', 'acc@5_b', 'acc@10_d', 'acc@10_b', 'acc@20_d', 'acc@20_b']
 
 for path in pathList:
     # create 'res_DataFrame' for each dataset

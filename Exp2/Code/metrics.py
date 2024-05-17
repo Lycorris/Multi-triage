@@ -57,13 +57,13 @@ def metrics(y, pred, split_pos, threshold=0.5, from_logits=True, topK=(1, 2, 3, 
     metric_name = []
 
     # split into Dev & Bug type, WARN: in some case this function may give more than 2 splits
-    # y_d, y_b = torch.split(y, split_pos, dim=1)
-    # pred_d, pred_b = torch.split(pred, split_pos, dim=1)
+    y_d, y_b = torch.split(y, split_pos, dim=1)
+    pred_d, pred_b = torch.split(pred, split_pos, dim=1)
     # use narrow instead
-    y_d = y.narrow(1, 0, split_pos[0])
-    y_b = y.narrow(1, split_pos[0], y.size(1) - split_pos[0])
-    pred_d = pred.narrow(1, 0, split_pos[0])
-    pred_b = pred.narrow(1, split_pos[0], pred.size(1) - split_pos[0])
+    # y_d = y.narrow(1, 0, split_pos[0])
+    # y_b = y.narrow(1, split_pos[0], y.size(1) - split_pos[0])
+    # pred_d = pred.narrow(1, 0, split_pos[0])
+    # pred_b = pred.narrow(1, split_pos[0], pred.size(1) - split_pos[0])
 
     # a(acc), p(precision), r(recall), F(F1)
     metric_name.extend(['acc', 'precision', 'recall', 'F1'])
@@ -93,5 +93,6 @@ if __name__ == '__main__':
     # top 3: 7 / 11
     # top 5: 11/ 11
     # print(top_K_accuracy(y_pred=y_pred, y_true=y_true, topK=(1, 2, 3, 5)))
+
     # top 1: (3/4, 4/7)
-    print(metrics(y=y_true, pred=y_pred, split_pos=[2,5], threshold=0.5, from_logits=False))
+    print(metrics(y=y_true, pred=y_pred, split_pos=[2,3], threshold=0.5, from_logits=False))
