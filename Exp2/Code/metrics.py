@@ -2,7 +2,9 @@ import torch
 from torch import nn
 
 '''
-    metrics: acc, P, R, F1, acc@K(1, 2, 3, 5, 10, 20)
+    metrics: acc, P, R, F1, 
+             acc@K(1, 2, 3, 5, 10, 20)
+
 '''
 
 
@@ -18,23 +20,15 @@ def top_K_accuracy(y_true, y_pred, topK):
         correct = (y_true * torch.zeros_like(y_true).scatter(1, pred[:, :k], 1)).float()
         rate = (correct.sum() / y_true.sum()).item()
         ret.append(rate)
-        if(rate > 1):
-            print(f"WARNING:rate: {rate}")
-            print(f"y_true: {y_true}")
-            print(f"y_pred: {y_pred}")
-            print(f"pred={pred}")
-            print(f"topK={topK}")
-            print(f"correct={correct}")
 
     return ret
 
 
-def confusion_matrix(y: torch.Tensor, pred: torch.Tensor, threshold: float = 0.5, from_logits=True):
+def confusion_matrix(y, pred, threshold=0.5, eps=1e-6, from_logits=True):
     if from_logits:
         pred = nn.Sigmoid()(pred)
     pred = torch.where(pred > threshold, 1, 0)
 
-    eps = 1e-6
     TP = torch.sum(y * pred, dim=1)
     TN = torch.sum((1 - y) * (1 - pred), dim=1)
     FP = torch.sum((1 - y) * pred, dim=1)
@@ -56,14 +50,10 @@ def metrics(y, pred, split_pos, threshold=0.5, from_logits=True, topK=(1, 2, 3, 
     res = []
     metric_name = []
 
-    # split into Dev & Bug type, WARN: in some case this function may give more than 2 splits
+    # split into Dev & Bug type
+    # WARN: in some case this function may give more than 2 splits
     y_d, y_b = torch.split(y, split_pos, dim=1)
     pred_d, pred_b = torch.split(pred, split_pos, dim=1)
-    # use narrow instead
-    # y_d = y.narrow(1, 0, split_pos[0])
-    # y_b = y.narrow(1, split_pos[0], y.size(1) - split_pos[0])
-    # pred_d = pred.narrow(1, 0, split_pos[0])
-    # pred_b = pred.narrow(1, split_pos[0], pred.size(1) - split_pos[0])
 
     # a(acc), p(precision), r(recall), F(F1)
     metric_name.extend(['acc', 'precision', 'recall', 'F1'])
@@ -95,4 +85,4 @@ if __name__ == '__main__':
     # print(top_K_accuracy(y_pred=y_pred, y_true=y_true, topK=(1, 2, 3, 5)))
 
     # top 1: (3/4, 4/7)
-    print(metrics(y=y_true, pred=y_pred, split_pos=[2,3], threshold=0.5, from_logits=False))
+    print(metrics(y=y_true, pred=y_pred, split_pos=[2, 3], threshold=0.5, from_logits=False))

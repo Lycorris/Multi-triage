@@ -79,7 +79,6 @@ def text_tensorize(data, _ckpt, _code_format):
     check_point = _ckpt
     tokenizer = AutoTokenizer.from_pretrained(check_point, local_files_only=True)
     # process code
-    # TODO: sanity check
     if _code_format == 'Front':
         data['Context'] = data['AST'] + data['Context']
     elif _code_format == 'Back':
@@ -110,8 +109,8 @@ def dataset_preprocess(_path, _code_format, _ckpt):
     # DATASET Read Data: extract data
     dataset = pd.read_csv(_path)
 
-    # 缩小数据集
-    dataset = dataset[:50]
+    # 缩小数据集 for DEBUG
+    # dataset = dataset[:50]
 
     dataset = dataset.rename(
         columns={'Title_Description': 'Context', 'AST': 'AST', 'FixedByID': 'Dev', 'Name': 'Btype'})
@@ -147,7 +146,6 @@ def split_and_wrap_dataset(data, _bsz, test_ratio=0.2, train_val_ratio=0.8):
 
 
 ### Multi Repo: split train/test and dataset process ###
-# TODO: extra training repo (_extra_paths)
 def dataset_preprocess_multi_repo(_paths, _code_format, _ckpt):
     """
     params:
@@ -160,8 +158,6 @@ def dataset_preprocess_multi_repo(_paths, _code_format, _ckpt):
     zips = [dataset_preprocess(_path, _code_format, _ckpt) for _path in _paths]
 
     datasets = [z[0] for z in zips]
-
-
     D_ids2tokens, B_ids2tokens = [z[1][0] for z in zips], [z[1][1] for z in zips]
 
     D_ids2token = list(set([D for D_ids2token in D_ids2tokens for D in D_ids2token]))
@@ -196,7 +192,6 @@ def split_and_wrap_dataset_multi_repo(datas, _bsz, test_ratio=0.2, train_val_rat
 
     # extract 20%(test_ratio) data from each repo
     test_datas = [data[int(train_ratio * len(data)):].reset_index(drop=True) for data in datas]
-
 
     # wrap dataset & dataloader
     train_dataset = TextCodeDataset(train_dataset)

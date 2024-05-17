@@ -4,39 +4,10 @@ from torch import nn
 import torch.nn.functional as F
 
 '''
-    losses: BCE, SparceBCELoss, FocalLoss, AsymmetricLossOptimized, SupConLoss
+    losses: BCE, SparceBCELoss, 
+            AsymmetricLossOptimized, SASL
+            FocalLoss, SupConLoss
 '''
-
-
-# TODO: find original paper and calculate to prove the correctness of the loss function
-class FocalLoss(nn.Module):
-    def __init__(self, alpha=0.25, gamma=2, reduction='mean'):
-        super().__init__()
-        self.alpha = alpha
-        self.gamma = gamma
-        self.reduction = reduction
-
-    def forward(self, inputs, targets):
-        p = torch.sigmoid(inputs)
-        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
-        p_t = p * targets + (1 - p) * (1 - targets)
-        loss = ce_loss * ((1 - p_t) ** self.gamma)
-
-        if self.alpha >= 0:
-            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
-            loss = alpha_t * loss
-
-        if self.reduction == "none":
-            pass
-        elif self.reduction == "mean":
-            loss = loss.mean()
-        elif self.reduction == "sum":
-            loss = loss.sum()
-        else:
-            raise ValueError(
-                f"Invalid Value for arg 'reduction': '{self.reduction}' \n Supported reduction modes: 'none', 'mean', 'sum'"
-            )
-        return loss
 
 
 class SparceBCELoss(nn.Module):
@@ -118,6 +89,57 @@ class AsymmetricLossOptimized(nn.Module):
             self.loss *= self.asymmetric_w
 
         return -self.loss.sum()
+
+
+class SparceAsymmetricLoss(nn.Module):
+    """
+    a flexible version of ASL,
+    which enable the loss to focus more on the performance of positive samples' prediction
+    """
+
+    def __init__(self, avg_label_types, total_label_types, miu=0.14, sigma=0.1, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        label_types_ratio = avg_label_types / total_label_types
+        z = (label_types_ratio + miu) / sigma
+        self.weight_pos = 1 / (1 + np.exp(-z))
+        self.weight_neg = 1 - self.weight_pos
+        print(f"loss_pos={self.weight_pos}, loss_neg={self.weight_neg}")
+
+        self.loss_fn = AsymmetricLossOptimized(gamma_neg=self.weight_neg, gamma_pos=self.weight_pos)
+
+    def forward(self, x, y):
+        _loss = self.loss_fn(x, y)
+        return _loss
+
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2, reduction='mean'):
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        p = torch.sigmoid(inputs)
+        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        p_t = p * targets + (1 - p) * (1 - targets)
+        loss = ce_loss * ((1 - p_t) ** self.gamma)
+
+        if self.alpha >= 0:
+            alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
+            loss = alpha_t * loss
+
+        if self.reduction == "none":
+            pass
+        elif self.reduction == "mean":
+            loss = loss.mean()
+        elif self.reduction == "sum":
+            loss = loss.sum()
+        else:
+            raise ValueError(
+                f"Invalid Value for arg 'reduction': '{self.reduction}' \n Supported reduction modes: 'none', 'mean', 'sum'"
+            )
+        return loss
 
 
 class SupConLoss(nn.Module):

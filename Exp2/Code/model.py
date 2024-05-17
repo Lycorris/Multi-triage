@@ -23,6 +23,21 @@ from transformers import AutoModel, AutoModelForSequenceClassification
 """
 
 
+def get_model(_model_type, exp, n_classes, _code_format,
+              _ckpt, _code_ckpt, _model_ckpt,
+              device):
+    model = None
+    if _model_type == 'Multi-triage':
+        model = MetaModel(n_classes=n_classes, use_AST=(_code_format == 'Separate'))
+    elif exp in [1, 2]:
+        model = PretrainModel(text_ckpt=_ckpt, code_ckpt=_code_ckpt, n_classes=n_classes,
+                              use_AST=(_code_format == 'Separate'))
+    elif exp in [3, 4]:
+        model = PreTrainModelStage(model_ckpt=_model_ckpt, n_classes=n_classes)
+    model = model.to(device)
+    return model
+
+
 class PretrainModel(nn.Module):
     def __init__(self, text_ckpt, code_ckpt, n_classes, n_linear_concat=1000, use_AST=True):
         super().__init__()
@@ -35,9 +50,10 @@ class PretrainModel(nn.Module):
         self.use_AST = use_AST
 
         self.text_model = AutoModelForSequenceClassification.from_pretrained(
-            text_ckpt, num_labels=self.n, problem_type="multi_label_classification",local_files_only=True)
+            text_ckpt, num_labels=self.n, problem_type="multi_label_classification", local_files_only=True)
         self.code_model = AutoModelForSequenceClassification.from_pretrained(
-            code_ckpt, num_labels=self.n, problem_type="multi_label_classification",local_files_only=True) if use_AST else None
+            code_ckpt, num_labels=self.n, problem_type="multi_label_classification",
+            local_files_only=True) if use_AST else None
 
         self.fc = nn.Sequential(
             nn.BatchNorm1d(2 * self.n, affine=False),
@@ -65,52 +81,31 @@ class PretrainModel(nn.Module):
         return y
 
 
-# TODO: Sanity Check
-class PreTrainModel2Stage(nn.Module):
-    def __init__(self, text_ckpt, code_ckpt, n_classes, n_emb_dim=768, n_linear_concat=1000, use_AST=True):
-        super().__init__()
-        self.text_ckpt = text_ckpt
-        self.code_ckpt = code_ckpt
-        self.n = n_classes[0] + n_classes[1]
-        self.n_emb_dim = n_emb_dim
-        self.n_D = n_classes[0]
-        self.n_B = n_classes[1]
-        self.use_AST = use_AST
-        self.n_linear_concat = n_linear_concat
-        self.hidden_size = 768
+class PreTrainModelStage(nn.Module):
+    def __init__(self, model_ckpt, n_classes, linear_concat=1000):
+        super(PreTrainModelStage, self).__init__()
+        self.saved_model = torch.load(model_ckpt)
+        self.linear_concat = linear_concat
+        self.n_classes_D, self.n_classes_B = n_classes
 
-        # hidden_size % 12 should be 0
-        self.text_model = AutoModel.from_pretrained(
-            text_ckpt, hidden_size=self.hidden_size,local_files_only=True)
-        self.code_model = AutoModel.from_pretrained(
-            code_ckpt, hidden_size=self.hidden_size,local_files_only=True) if use_AST else None
+        # trade-off 训练时间 & 精度
+        # # 设置模型为不进行梯度更新
+        # for param in self.saved_model.parameters():
+        #     param.requires_grad = False
 
-        self.fc = nn.Sequential(
-            nn.BatchNorm1d(2 * self.hidden_size, affine=False),
-            nn.Dropout(0.5),
-            nn.Linear(2 * self.n, self.n_emb_dim),
-            nn.ReLU()
-        )
+        self.fc = nn.Linear(self.saved_model.fc_B.out_features + self.saved_model.fc_D.out_features,
+                            self.linear_concat)
+        self.fc_D = nn.Linear(self.linear_concat, self.n_classes_D)
+        self.fc_B = nn.Linear(self.linear_concat, self.n_classes_B)
 
-        self.fc_D = nn.Linear(self.n_linear_concat, self.n_D)
-        self.fc_B = nn.Linear(self.n_linear_concat, self.n_B)
-     
-
-    def forward(self, x_C, x_A, stage):
-        x_C = self.text_model(x_C['input_ids'].squeeze(dim=1), x_C['attention_mask'].squeeze(dim=1))[0]
-        if stage == 1 and not self.use_AST:
-            return x_C
-        x_A = self.code_model(x_A['input_ids'].squeeze(dim=1), x_A['attention_mask'].squeeze(dim=1))[0]
-
-        x = torch.concat((x_C, x_A), dim=1)
+    def forward(self, x, _=None):
+        # 为x_a占位
+        x = self.saved_model(x, _)
         x = self.fc(x)
-        if stage == 1:
-            return x
 
         y_D = self.fc_D(x)
         y_B = self.fc_B(x)
         y = torch.concat((y_D, y_B), dim=1)
-
         return y
 
 
@@ -178,26 +173,4 @@ class MetaModel(nn.Module):
 
 
 if __name__ == '__main__':
-    from transformers import AlbertModel
-    # Sanity Test
-    Batch_sz = 64
-    MAX_SEQ_LEN = 300
-    from_emb = False
-    from_token = True
-    pretrained_model = AlbertModel.from_pretrained('albert-base-v2').to('cpu')
-    vocab_size = [12513, 5910]
-    EMB_DIM = 100 if not from_emb and not from_token else 768
-    filter = [64, 64]
-    linear_concat = 50
-    n_classes = [396, 204]
-
-    model = MetaModel(MAX_SEQ_LEN, from_emb, from_token, pretrained_model, vocab_size, EMB_DIM, filter, linear_concat,
-                      n_classes)
-    model.eval()
-    with torch.no_grad():
-        input_C, input_A = torch.ones((Batch_sz, MAX_SEQ_LEN)).long(), torch.ones((Batch_sz, MAX_SEQ_LEN)).long()
-        output_d, output_b = model(input_C, input_A)
-    print(output_d.shape)
-    print(output_d)
-    print(output_b.shape)
-    print(output_b)
+    pass
