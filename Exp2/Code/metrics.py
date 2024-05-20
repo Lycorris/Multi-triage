@@ -24,10 +24,8 @@ def top_K_accuracy(y_true, y_pred, topK):
     return ret
 
 
-def confusion_matrix(y, pred, threshold=0.5, eps=1e-6, from_logits=True):
-    if from_logits:
-        pred = nn.Sigmoid()(pred)
-    pred = torch.where(pred > threshold, 1, 0)
+def confusion_matrix(y, pred, threshold=0.5, eps=1e-6):
+    pred = torch.where(pred >= threshold, 1, 0)
 
     TP = torch.sum(y * pred, dim=1)
     TN = torch.sum((1 - y) * (1 - pred), dim=1)
@@ -50,6 +48,9 @@ def metrics(y, pred, split_pos, threshold=0.5, from_logits=True, topK=(1, 2, 3, 
     res = []
     metric_name = []
 
+    # convert to one-hot vector
+    if from_logits:
+        pred = nn.Sigmoid()(pred)
     # split into Dev & Bug type
     # WARN: in some case this function may give more than 2 splits
     y_d, y_b = torch.split(y, split_pos, dim=1)
@@ -57,8 +58,8 @@ def metrics(y, pred, split_pos, threshold=0.5, from_logits=True, topK=(1, 2, 3, 
 
     # a(acc), p(precision), r(recall), F(F1)
     metric_name.extend(['acc', 'precision', 'recall', 'F1'])
-    a_p_r_F = list(zip(confusion_matrix(y_d, pred_d, threshold, from_logits),
-                       confusion_matrix(y_b, pred_b, threshold, from_logits)))
+    a_p_r_F = list(zip(confusion_matrix(y_d, pred_d, threshold),
+                       confusion_matrix(y_b, pred_b, threshold)))
     res.extend(a_p_r_F)
 
     # acc@(1, 2, 3, 5, 10, 20)
@@ -85,4 +86,5 @@ if __name__ == '__main__':
     # print(top_K_accuracy(y_pred=y_pred, y_true=y_true, topK=(1, 2, 3, 5)))
 
     # top 1: (3/4, 4/7)
-    print(metrics(y=y_true, pred=y_pred, split_pos=[2, 3], threshold=0.5, from_logits=False))
+    for k, v in metrics(y=y_true, pred=y_pred, split_pos=[2, 3], threshold=0.5, from_logits=True).items():
+        print(f'{k}: {v}')

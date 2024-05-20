@@ -147,6 +147,7 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None',
 
             for t, test_dataloader in enumerate(test_dataloaders):
                 test_metric = test_process(model, test_dataloader, loss_fn, n_classes)
+                res.append(test_metric)
                 logstr = update_logstr(logstr, t=t, test_metric=test_metric)
 
                 avg_test_metric = {k: (v[0] + test_metric[k][0] * len(test_dataloader) / t_ds_len,
@@ -154,7 +155,7 @@ def train_imm(_path, _logname, _loss_fn, _code_format='None',
                                    for k, v in avg_test_metric.items()}
             if len(test_dataloaders) > 1:
                 logstr = update_logstr(logstr, avg_test_metric=avg_test_metric)
-            res.append(avg_test_metric)
+                res.append(avg_test_metric)
             if exp == 2:
                 model_path = '_'.join(_logname.split(' ')[1:4])
                 print(f'model_path: {model_path}')
